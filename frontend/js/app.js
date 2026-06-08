@@ -38,6 +38,9 @@ async function inicializarQuiniela() {
         // Suscripción activa = el admin le activó el paquete
         suscripcionActiva  = datosSub.ok && datosSub.suscripcion !== null;
 
+        // Mostrar y actualizar panel de goles si está activo
+        actualizarPanelGoles(datosSub.suscripcion, datosSub.partidosDesbloqueados);
+
         // Guardar modificaciones en memoria por partido
         if (datosSub.ok && datosSub.partidosDesbloqueados) {
             datosSub.partidosDesbloqueados.forEach(d => {
@@ -125,6 +128,17 @@ function renderizarPartidos(partidosAMostrar, pronosticosGuardados = []) {
             inputLocal.readOnly = inputVisitante.readOnly = true;
             row.style.opacity   = "0.6";
             estadoDiv.innerHTML = `<span class="badge-estado-partido sin-plan">🔒Esperando autorización...</span>`;
+
+        } else if (memPartido === null) {
+            // El partido no está desbloqueado
+            inputLocal.readOnly = inputVisitante.readOnly = true;
+            const btnDesbloquear = document.createElement("button");
+            btnDesbloquear.className = "btn-desbloquear-partido";
+            btnDesbloquear.innerHTML = `<i class="fa-solid fa-lock-open"></i> <small>Desbloquear</small>`;
+            btnDesbloquear.addEventListener("click", () =>
+                desbloquearPartido(partido, btnDesbloquear)
+            );
+            estadoDiv.appendChild(btnDesbloquear);
 
         } else if (modRestantes === 0) {
             // Agotó las 3 modificaciones
@@ -310,5 +324,84 @@ function cargarPerfilUsuario() {
     if (imgSidebar && fotoGuardada && fotoGuardada !== "") {
         imgSidebar.src     = fotoGuardada;
         imgSidebar.onerror = () => { imgSidebar.src = "./img/user-icon.png"; };
+    }
+}
+
+// ─── CONTROL DE GOLES Y DESBLOQUEO DE PARTIDOS ───────────────────────────────
+
+function actualizarPanelGoles(suscripcion, partidosDesbloqueados) {
+    const panel = document.getElementById("panelGoles");
+    if (!panel) return;
+
+    if (suscripcion) {
+        panel.style.display = "block";
+        const txtPaquete = document.getElementById("txtPaquete");
+        const txtGolesRestantes = document.getElementById("txtGolesRestantes");
+        const barGoles = document.getElementById("barGoles");
+        const txtPartidosDesbloqueados = document.getElementById("txtPartidosDesbloqueados");
+
+        if (txtPaquete) txtPaquete.textContent = suscripcion.Paquete || "Plan Activo";
+        if (txtGolesRestantes) txtGolesRestantes.textContent = `${suscripcion.GolesRestantes} goles`;
+        
+        const totalDesbloqueados = partidosDesbloqueados ? partidosDesbloqueados.length : 0;
+        if (txtPartidosDesbloqueados) {
+            txtPartidosDesbloqueados.textContent = `${totalDesbloqueados} / ${suscripcion.MaxPartidos} partidos`;
+        }
+
+        if (barGoles) {
+            const pct = suscripcion.GolesIniciales > 0 ? (suscripcion.GolesRestantes / suscripcion.GolesIniciales) * 100 : 0;
+            barGoles.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+        }
+    } else {
+        panel.style.display = "none";
+    }
+}
+
+async function desbloquearPartido(partido, btn) {
+    const idUsuario = parseInt(localStorage.getItem("idUsuario"));
+    const horaLimpia = partido.hora.replace(" hrs", "");
+    const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00`);
+
+    if (!confirm(`¿Desbloquear el partido ${partido.local} vs ${partido.visitante}?`)) return;
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = `⏳`;
+
+        const res = await fetch(`${API_URL}/api/desbloquear-partido`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                idUsuario,
+                partidoId: partido.id,
+                fechaPartido: fechaPartido.toISOString()
+            })
+        });
+
+        const data = await res.json();
+        mostrarMensaje(data.message, data.ok ? "success" : "error");
+
+        if (data.ok) {
+            // Actualizar localmente la memoria para evitar esperas
+            pronosticosMemoria[partido.id] = { ModificacionesUsadas: 0 };
+
+            // Recargar datos actualizados del backend
+            const [resQuiniela, resDatos] = await Promise.all([
+                fetch(`${API_URL}/api/obtener-quiniela/${idUsuario}`),
+                fetch(`${API_URL}/api/mis-datos/${idUsuario}`)
+            ]);
+            const datosDB = await resQuiniela.json();
+            const datosSub = await resDatos.json();
+
+            actualizarPanelGoles(datosSub.suscripcion, datosSub.partidosDesbloqueados);
+            renderizarPartidos(partidosGlobal, datosDB.pronosticos);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-lock-open"></i> <small>Desbloquear</small>`;
+        }
+    } catch (error) {
+        mostrarMensaje("Error al conectar.", "error");
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-lock-open"></i> <small>Desbloquear</small>`;
     }
 }

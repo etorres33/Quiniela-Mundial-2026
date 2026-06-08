@@ -157,10 +157,10 @@ router.post('/guardar-quiniela', async (req, res) => {
         );
 
         const msg = errores.length > 0
-            ? `✅ ${guardados} guardados. ⚠️ ${errores.join(' | ')}`
+            ? `⚠️ No se pudo guardar: ${errores.join(' | ')}`
             : `✅ Pronóstico guardado correctamente.`;
 
-        return res.json({ ok: true, message: msg, golesRestantes: goles_restantes });
+        return res.json({ ok: guardados > 0, message: msg, golesRestantes: goles_restantes });
 
     } catch (error) {
         console.error(error);
