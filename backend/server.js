@@ -132,7 +132,15 @@ app.post("/api/login", async (req, res) => {
 const perfilSchema = z.object({
     idUsuario:    z.number().int().positive(),
     nuevoNombre:  z.string().min(2).max(100).trim(),
-    nuevaFotoUrl: z.string().trim().url().optional().or(z.literal(""))
+    nuevaFotoUrl: z.string().trim().max(1000000).refine(val => {
+        if (val === "") return true;
+        if (val.startsWith("http://") || val.startsWith("https://")) return true;
+        if (val.startsWith("data:image/")) return true;
+        if (val.startsWith("./") || val.startsWith("img/")) return true;
+        return false;
+    }, {
+        message: "La foto debe ser una URL válida, ruta local o imagen base64."
+    }).optional().nullable()
 });
 
 const restablecerSchema = z.object({

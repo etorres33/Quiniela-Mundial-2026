@@ -162,6 +162,11 @@ function configurarFormularioPerfil() {
                 nombreSidebar.textContent = nuevoNombre;
             }
 
+            const imgSidebar = document.getElementById("imgAvatarSidebar");
+            if (imgSidebar) {
+                imgSidebar.src = nuevaFotoUrl !== "" ? nuevaFotoUrl : "./img/user-icon.png";
+            }
+
             mostrarMensaje("✅ Perfil actualizado correctamente.", "success");
 
         } catch (error) {

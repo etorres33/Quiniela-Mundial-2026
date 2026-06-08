@@ -37,8 +37,14 @@ const query = (text, params) => pool.query(text, params);
             )
         `);
         console.log('✅ Tabla logs_actividad verificada/creada.');
+
+        // Modificar columna foto_url a TEXT para soportar base64 o URLs muy largas
+        await pool.query(`
+            ALTER TABLE usuarios ALTER COLUMN foto_url TYPE TEXT;
+        `);
+        console.log('✅ Columna foto_url modificada a TEXT.');
     } catch (err) {
-        console.error('❌ Error al verificar/crear tabla logs_actividad:', err);
+        console.error('❌ Error al verificar/crear tabla/columna:', err);
     }
 })();
 
