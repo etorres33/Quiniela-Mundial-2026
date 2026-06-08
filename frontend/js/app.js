@@ -69,7 +69,7 @@ function renderizarPartidos(partidosAMostrar, pronosticosGuardados = []) {
 
     partidosAMostrar.forEach((partido) => {
         const horaLimpia   = partido.hora.replace(" hrs", "");
-        const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00`);
+        const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00 GMT-0600`);
         const msHasta      = fechaPartido.getTime() - Date.now();
         const yaEmpezó     = msHasta <= 0;
         const memPartido   = pronosticosMemoria[partido.id] || null;
@@ -240,21 +240,36 @@ async function inicializarPronosticoCampeon() {
     const panel = document.getElementById("panelCampeon");
     if (!panel) return;
 
+    const DEADLINE_CAMPEON = new Date("June 11, 2026 13:00:00 GMT-0600").getTime();
+    const yaInicioMundial = Date.now() >= DEADLINE_CAMPEON;
+
+    const inputCampeon = document.getElementById("inputCampeon");
+    const inputGL      = document.getElementById("inputCampeonGL");
+    const inputGV      = document.getElementById("inputCampeonGV");
+    const btnCampeon   = document.getElementById("btnGuardarCampeon");
+
     try {
         const res  = await fetch(`${API_URL}/api/campeon/${idUsuario}`);
         const data = await res.json();
         if (data.ok && data.campeon) {
             const { SeleccionCampeon, GolesLocal, GolesVisitante } = data.campeon;
-            const inputCampeon = document.getElementById("inputCampeon");
-            const inputGL      = document.getElementById("inputCampeonGL");
-            const inputGV      = document.getElementById("inputCampeonGV");
             if (inputCampeon) inputCampeon.value = SeleccionCampeon;
             if (inputGL)      inputGL.value      = GolesLocal ?? "";
             if (inputGV)      inputGV.value      = GolesVisitante ?? "";
         }
     } catch (e) { console.error(e); }
 
-    const btnCampeon = document.getElementById("btnGuardarCampeon");
+    if (yaInicioMundial) {
+        if (inputCampeon) inputCampeon.disabled = true;
+        if (inputGL)      inputGL.disabled = true;
+        if (inputGV)      inputGV.disabled = true;
+        if (btnCampeon) {
+            btnCampeon.disabled = true;
+            btnCampeon.innerHTML = `🔒 Bloqueado`;
+        }
+        return;
+    }
+
     if (!btnCampeon) return;
 
     btnCampeon.addEventListener("click", async () => {
@@ -301,7 +316,7 @@ function obtenerEmojiBandera(codigoPais) {
 }
 
 function iniciarTemporizador() {
-    const fechaMundial    = new Date("June 11, 2026 13:00:00").getTime();
+    const fechaMundial    = new Date("June 11, 2026 13:00:00 GMT-0600").getTime();
     const contenedorReloj = document.querySelector(".timer-card h3");
     if (!contenedorReloj) return;
     const intervalo = setInterval(() => {

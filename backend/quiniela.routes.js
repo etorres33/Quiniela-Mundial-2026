@@ -3,6 +3,16 @@ const router     = express.Router();
 const { z }      = require('zod');
 const nodemailer = require('nodemailer');
 const { query }  = require('./db');
+const path       = require('path');
+const fs         = require('fs');
+
+let partidos = [];
+try {
+    const dataPath = path.join(__dirname, 'data', 'partidos.json');
+    partidos = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+} catch (err) {
+    console.error('Error al cargar partidos.json en el backend:', err);
+}
 
 // ─── NODEMAILER ───────────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
@@ -109,8 +119,21 @@ router.post('/guardar-quiniela', async (req, res) => {
             }
 
             // 2. Calcular costo diferencial
-            const fechaPartido  = fechasPartidos?.[pro.partidoId];
-            const msHasta       = fechaPartido ? new Date(fechaPartido).getTime() - Date.now() : Infinity;
+            const partido = partidos.find(p => p.id === pro.partidoId);
+            if (!partido) {
+                errores.push(`Partido #${pro.partidoId} no encontrado.`);
+                continue;
+            }
+
+            const horaLimpia   = partido.hora.replace(" hrs", "");
+            const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00 GMT-0600`);
+            const msHasta      = fechaPartido.getTime() - Date.now();
+
+            if (msHasta <= 0) {
+                errores.push(`Partido #${pro.partidoId} (${partido.local} vs ${partido.visitante}) ya comenzó y no se puede modificar.`);
+                continue;
+            }
+
             const costoActual   = calcularCostoGoles(msHasta) || 1;
             const costoExtra    = Math.max(0, costoActual - goles_gastados);
 
@@ -216,8 +239,8 @@ router.get('/mis-datos/:idUsuario', async (req, res) => {
 // ─── DESBLOQUEAR PARTIDO ──────────────────────────────────────────────────────
 router.post('/desbloquear-partido', async (req, res) => {
     try {
-        const { idUsuario, partidoId, fechaPartido } = req.body;
-        if (!idUsuario || !partidoId || !fechaPartido)
+        const { idUsuario, partidoId } = req.body;
+        if (!idUsuario || !partidoId)
             return res.status(400).json({ ok: false, message: 'Datos incompletos.' });
 
         const sub = await query(
@@ -235,7 +258,13 @@ router.post('/desbloquear-partido', async (req, res) => {
         if (parseInt(total.rows[0].count) >= max_partidos)
             return res.status(403).json({ ok: false, message: `⛔ Ya alcanzaste el límite (${max_partidos} partidos).` });
 
-        const ms    = new Date(fechaPartido).getTime() - Date.now();
+        const partido = partidos.find(p => p.id === partidoId);
+        if (!partido)
+            return res.status(404).json({ ok: false, message: 'Partido no encontrado.' });
+
+        const horaLimpia   = partido.hora.replace(" hrs", "");
+        const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00 GMT-0600`);
+        const ms    = fechaPartido.getTime() - Date.now();
         const costo = calcularCostoGoles(ms);
         if (costo === null)
             return res.status(403).json({ ok: false, message: '⛔ El partido ya empezó.' });
@@ -295,8 +324,18 @@ router.post('/guardar-resultado', async (req, res) => {
 
         for (const pro of pros.rows) {
             let puntos = 0, estado = 'Falló';
-            if (pro.pro_local===golesLocal && pro.pro_visitante===golesVisitante) { puntos=5; estado='Exacto'; }
-            else if ((pro.pro_local>pro.pro_visitante&&golesLocal>golesVisitante)||(pro.pro_local<pro.pro_visitante&&golesLocal<golesVisitante)||(pro.pro_local===pro.pro_visitante&&golesLocal===golesVisitante)) { puntos=3; estado='Acierto'; }
+            if (pro.pro_local===golesLocal && pro.pro_visitante===golesVisitante) { 
+                puntos=5; 
+                estado='Exacto'; 
+            }
+            else if (pro.pro_local===pro.pro_visitante && golesLocal===golesVisitante) { 
+                puntos=1; 
+                estado='Acierto'; 
+            }
+            else if ((pro.pro_local>pro.pro_visitante&&golesLocal>golesVisitante)||(pro.pro_local<pro.pro_visitante&&golesLocal<golesVisitante)) { 
+                puntos=3; 
+                estado='Acierto'; 
+            }
             enviarCorreoResultado({ correo:pro.correo, nombre:pro.nombre, local:local||'Local', visitante:visitante||'Visitante', golesLocal, golesVisitante, proLocal:pro.pro_local, proVisitante:pro.pro_visitante, puntos, estado }).catch(console.error);
         }
     } catch (error) {
@@ -333,8 +372,18 @@ router.post('/calcular-puntos', async (req, res) => {
 
         pros.rows.forEach(row => {
             const id = row.id_usuario;
-            if (row.pro_local===row.real_local && row.pro_visitante===row.real_visitante) { mapaPuntos[id]+=5; mapaAciertos[id]+=1; }
-            else if ((row.pro_local>row.pro_visitante&&row.real_local>row.real_visitante)||(row.pro_local<row.pro_visitante&&row.real_local<row.real_visitante)||(row.pro_local===row.pro_visitante&&row.real_local===row.real_visitante)) { mapaPuntos[id]+=3; mapaAciertos[id]+=1; }
+            if (row.pro_local===row.real_local && row.pro_visitante===row.real_visitante) { 
+                mapaPuntos[id]+=5; 
+                mapaAciertos[id]+=1; 
+            }
+            else if (row.pro_local===row.pro_visitante && row.real_local===row.real_visitante) { 
+                mapaPuntos[id]+=1; 
+                mapaAciertos[id]+=1; 
+            }
+            else if ((row.pro_local>row.pro_visitante&&row.real_local>row.real_visitante)||(row.pro_local<row.pro_visitante&&row.real_local<row.real_visitante)) { 
+                mapaPuntos[id]+=3; 
+                mapaAciertos[id]+=1; 
+            }
         });
 
         const campeonReal = await query(`SELECT * FROM resultado_campeon ORDER BY id_resultado DESC LIMIT 1`);
@@ -369,7 +418,7 @@ router.get('/tabla-general', async (req, res) => {
         const result = await query(`
             SELECT u.id_usuario AS "IdUsuario", u.nombre AS "Nombre", u.foto_url AS "FotoUrl",
                    COALESCE(p.puntos_totales,0) AS "Puntos",
-                   DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC, u.nombre ASC) AS "PosicionReal",
+                   DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC) AS "PosicionReal",
                    (SELECT COUNT(*) FROM pronosticos pr WHERE pr.id_usuario=u.id_usuario) AS "Predicciones",
                    (SELECT COUNT(*) FROM pronosticos pr
                     INNER JOIN resultados_reales rr ON pr.partido_id=rr.partido_id
@@ -415,7 +464,8 @@ router.get('/mis-resultados/:idUsuario', async (req, res) => {
             let pts=0, estado='Pendiente';
             if (row.real_local===null) { pendientes++; }
             else if (row.pro_local===row.real_local&&row.pro_visitante===row.real_visitante) { exactos++; pts=5; estado='Exacto'; }
-            else if ((row.pro_local>row.pro_visitante&&row.real_local>row.real_visitante)||(row.pro_local<row.pro_visitante&&row.real_local<row.real_visitante)||(row.pro_local===row.pro_visitante&&row.real_local===row.real_visitante)) { correctos++; pts=3; estado='Acierto'; }
+            else if (row.pro_local===row.pro_visitante&&row.real_local===row.real_visitante) { correctos++; pts=1; estado='Acierto'; }
+            else if ((row.pro_local>row.pro_visitante&&row.real_local>row.real_visitante)||(row.pro_local<row.pro_visitante&&row.real_local<row.real_visitante)) { correctos++; pts=3; estado='Acierto'; }
             else { fallados++; estado='Falló'; }
             puntos+=pts;
             return { partidoId:row.partido_id, pronostico:`${row.pro_local} - ${row.pro_visitante}`, resultadoReal:row.real_local!==null?`${row.real_local} - ${row.real_visitante}`:'Pendiente', puntos:pts, estado };
@@ -441,6 +491,10 @@ router.get('/mis-resultados/:idUsuario', async (req, res) => {
 // ─── CAMPEÓN ──────────────────────────────────────────────────────────────────
 router.post('/campeon', async (req, res) => {
     try {
+        const DEADLINE_CAMPEON = new Date("2026-06-11T13:00:00 GMT-0600").getTime();
+        if (Date.now() >= DEADLINE_CAMPEON) {
+            return res.status(403).json({ ok: false, message: '⛔ El pronóstico de campeón ya está bloqueado.' });
+        }
         const { idUsuario, seleccionCampeon, golesLocal, golesVisitante } = campeonSchema.parse(req.body);
         await query(
             `INSERT INTO pronosticos_campeon (id_usuario, seleccion_campeon, goles_local, goles_visitante)
@@ -650,17 +704,45 @@ router.post('/admin/revelar-ganadores', async (req, res) => {
             SELECT u.id_usuario AS "IdUsuario", u.nombre AS "Nombre",
                    COALESCE(p.puntos_totales,0) AS "Puntos",
                    DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC) AS "Posicion"
-            FROM usuarios u LEFT JOIN puntajes p ON u.id_usuario=p.id_usuario WHERE u.activo=TRUE LIMIT 5
+            FROM usuarios u LEFT JOIN puntajes p ON u.id_usuario=p.id_usuario WHERE u.activo=TRUE AND u.id_usuario <> 1
         `);
 
         const ranking = rankingResult.rows;
-        const pos1=ranking.filter(u=>u.Posicion===1), pos2=ranking.filter(u=>u.Posicion===2), pos3=ranking.filter(u=>u.Posicion===3);
-        const combinar = (arr,premios) => { const t=premios.reduce((a,b)=>a+b,0); return arr.map(u=>({...u,montoPremio:t/arr.length,porcentaje:((t/bolsaPremios)*100/arr.length).toFixed(2)})); };
-        let distribucion=[];
-        if (pos1.length>1)      distribucion=[...combinar(pos1,[premio1,premio2]),...combinar(pos2.length?pos2:pos3,[premio3])];
-        else if (pos2.length>1) distribucion=[...combinar(pos1,[premio1]),...combinar(pos2,[premio2,premio3])];
-        else if (pos3.length>1) distribucion=[...combinar(pos1,[premio1]),...combinar(pos2,[premio2]),...combinar(pos3,[premio3])];
-        else distribucion=[...(pos1[0]?[{...pos1[0],montoPremio:premio1,porcentaje:'50.00'}]:[]),...(pos2[0]?[{...pos2[0],montoPremio:premio2,porcentaje:'30.00'}]:[]),...(pos3[0]?[{...pos3[0],montoPremio:premio3,porcentaje:'20.00'}]:[])];
+        const groups = {};
+        ranking.forEach(u => {
+            if (!groups[u.Puntos]) groups[u.Puntos] = [];
+            groups[u.Puntos].push(u);
+        });
+
+        const sortedPoints = Object.keys(groups).map(Number).sort((a,b) => b - a);
+        const prizes = [premio1, premio2, premio3];
+        let distribucion = [];
+
+        let prizeIdx = 0;
+        for (const pts of sortedPoints) {
+            if (prizeIdx >= prizes.length) break;
+            const groupUsers = groups[pts];
+            const L = groupUsers.length;
+            const groupPrizes = prizes.slice(prizeIdx, prizeIdx + L);
+            prizeIdx += L;
+
+            if (groupPrizes.length === 0) break;
+
+            const sumPrizes = groupPrizes.reduce((a,b) => a + b, 0);
+            const prizePerUser = sumPrizes / L;
+            const pctPerUser = ((sumPrizes / bolsaPremios) * 100 / L).toFixed(2);
+
+            groupUsers.forEach(u => {
+                distribucion.push({
+                    IdUsuario: u.IdUsuario,
+                    Nombre: u.Nombre,
+                    Puntos: u.Puntos,
+                    Posicion: u.Posicion,
+                    montoPremio: prizePerUser,
+                    porcentaje: pctPerUser
+                });
+            });
+        }
 
         for (const g of distribucion) {
             await query(
