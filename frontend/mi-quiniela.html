@@ -35,70 +35,94 @@
                         <span>DÍAS</span><span>HRS</span><span>MIN</span><span>SEG</span>
                     </div>
                 </div>
-                <div class="filtro-grupo">
-                    <label for="selectGrupo">Filtrar: </label>
-                    <select id="selectGrupo">
-                        <option value="TODOS">Todos</option>
-                        <option value="A">Grupo A</option><option value="B">Grupo B</option>
-                        <option value="C">Grupo C</option><option value="D">Grupo D</option>
-                        <option value="E">Grupo E</option><option value="F">Grupo F</option>
-                        <option value="G">Grupo G</option><option value="H">Grupo H</option>
-                        <option value="I">Grupo I</option><option value="J">Grupo J</option>
-                        <option value="K">Grupo K</option><option value="L">Grupo L</option>
-                    </select>
-                </div>
             </div>
 
-            <!-- TABLA DE PARTIDOS -->
-            <div class="quiniela-card">
-                <div class="quiniela-row table-head">
-                    <span>Partido</span>
-                    <span>Tu Pronóstico</span>
-                    <span>Fecha</span>
-                    <span>Estado</span>
-                </div>
-                <div id="quinielaContainer"></div>
+            <!-- ─── TABS VISTA ─────────────────────────────────────────── -->
+            <div class="vista-tabs">
+                <button class="vista-tab vista-tab--activo" id="tabPronosticos" onclick="cambiarVista('pronosticos')">
+                    📋 Mis Pronósticos
+                </button>
+                <button class="vista-tab" id="tabGrupos" onclick="cambiarVista('grupos')">
+                    📊 Tabla de Grupos
+                </button>
             </div>
 
-            <p class="warning">
-                <i class="fa-solid fa-circle-info"></i>
-                Máximo 3 modificaciones por partido. Los partidos en juego no se pueden modificar.
-                Una vez que hayas modificado 3 veces, ya no será posible modificar.
-            </p>
-
-            <div id="mensajeQuiniela"></div>
-
-            <!-- ⚽ SECCIÓN PRONÓSTICO DE CAMPEÓN -->
-            <div class="panel-campeon" id="panelCampeon">
-                <div class="campeon-header">
-                    <span class="campeon-icon">🏆</span>
-                    <div>
-                        <h3>Pronóstico del Campeón</h3>
-                        <p>¿Quién ganará el Mundial 2026? Acertar te da <strong>15 pts</strong>, con marcador exacto <strong>25 pts</strong>.</p>
-                        <small style="color:#b8c2d6;">Solo tiempo regular — sin tiempo extra ni penales.</small>
-                    </div>
-                </div>
-                <div class="campeon-form">
-                    <div class="campeon-input-group">
-                        <label>Selección Campeona</label>
-                        <select id="selectCampeon" style="width:100%; background:#0d1f33; color:white; border:1px solid rgba(255,255,255,.2); padding:.6rem 1rem; border-radius:8px; margin-top:.3rem; height:42px; outline:none; cursor:pointer;">
-                            <option value="">-- Selecciona país --</option>
+            <!-- ─── VISTA: MIS PRONÓSTICOS ─────────────────────────────── -->
+            <div id="vistaPronosticos">
+                <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+                    <div class="filtro-grupo">
+                        <label for="selectGrupo">Filtrar: </label>
+                        <select id="selectGrupo">
+                            <option value="TODOS">Todos</option>
+                            <option value="A">Grupo A</option><option value="B">Grupo B</option>
+                            <option value="C">Grupo C</option><option value="D">Grupo D</option>
+                            <option value="E">Grupo E</option><option value="F">Grupo F</option>
+                            <option value="G">Grupo G</option><option value="H">Grupo H</option>
+                            <option value="I">Grupo I</option><option value="J">Grupo J</option>
+                            <option value="K">Grupo K</option><option value="L">Grupo L</option>
                         </select>
                     </div>
-                    <div class="campeon-marcador">
-                        <div class="campeon-input-group">
-                            <label>Goles Campeón</label>
-                            <input type="number" id="inputCampeonGL" min="0" max="20" placeholder="0">
-                        </div>
-                        <span class="campeon-vs">-</span>
-                        <div class="campeon-input-group">
-                            <label>Goles Rival</label>
-                            <input type="number" id="inputCampeonGV" min="0" max="20" placeholder="0">
+                </div>
+
+                <div class="quiniela-card">
+                    <div class="quiniela-row table-head">
+                        <span>Partido</span>
+                        <span>Tu Pronóstico</span>
+                        <span>Fecha</span>
+                        <span>Estado</span>
+                    </div>
+                    <div id="quinielaContainer"></div>
+                </div>
+
+                <p class="warning">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Máximo 3 modificaciones por partido. Los partidos en juego no se pueden modificar.
+                </p>
+
+                <div id="mensajeQuiniela"></div>
+
+                <!-- PRONÓSTICO CAMPEÓN -->
+                <div class="panel-campeon" id="panelCampeon">
+                    <div class="campeon-header">
+                        <span class="campeon-icon">🏆</span>
+                        <div>
+                            <h3>Pronóstico del Campeón</h3>
+                            <p>¿Quién ganará el Mundial 2026? Acertar te da <strong>15 pts</strong>, con marcador exacto <strong>25 pts</strong>.</p>
+                            <small style="color:#b8c2d6;">Solo tiempo regular — sin tiempo extra ni penales.</small>
                         </div>
                     </div>
-                    <button id="btnGuardarCampeon" class="btn-campeon">
-                        <i class="fa-solid fa-trophy"></i> Guardar pronóstico
-                    </button>
+                    <div class="campeon-form">
+                        <div class="campeon-input-group">
+                            <label>Selección Campeona</label>
+                            <select id="selectCampeon" style="width:100%; background:#0d1f33; color:white; border:1px solid rgba(255,255,255,.2); padding:.6rem 1rem; border-radius:8px; margin-top:.3rem; height:42px; outline:none; cursor:pointer;">
+                                <option value="">-- Selecciona país --</option>
+                            </select>
+                        </div>
+                        <div class="campeon-marcador">
+                            <div class="campeon-input-group">
+                                <label>Goles Campeón</label>
+                                <input type="number" id="inputCampeonGL" min="0" max="20" placeholder="0">
+                            </div>
+                            <span class="campeon-vs">-</span>
+                            <div class="campeon-input-group">
+                                <label>Goles Rival</label>
+                                <input type="number" id="inputCampeonGV" min="0" max="20" placeholder="0">
+                            </div>
+                        </div>
+                        <button id="btnGuardarCampeon" class="btn-campeon">
+                            <i class="fa-solid fa-trophy"></i> Guardar pronóstico
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── VISTA: TABLA DE GRUPOS ──────────────────────────────── -->
+            <div id="vistaGrupos" style="display:none;">
+                <div class="tabs-grupos-wrapper" id="tabsGrupos"></div>
+                <div id="tablaGruposContainer">
+                    <div style="text-align:center;padding:2rem;color:#b8c2d6;">
+                        ⏳ Cargando tabla de grupos...
+                    </div>
                 </div>
             </div>
 
@@ -106,8 +130,6 @@
 
         <!-- PANEL DERECHO -->
         <aside class="right-panel">
-
-            <!-- Perfil -->
             <div class="panel-card profile-card">
                 <div class="profile-header">
                     <img id="imgAvatarSidebar" src="./img/user-icon.png" alt="Avatar">
@@ -118,7 +140,6 @@
                 </div>
             </div>
 
-            <!-- Reglas rápidas -->
             <div class="panel-card">
                 <h3>📋 Reglas de puntos</h3>
                 <div class="regla-row-q"><span>Marcador exacto</span><strong class="text-green">5 pts</strong></div>
@@ -127,14 +148,28 @@
                 <div class="regla-row-q"><span>Campeón correcto</span><strong class="text-green">15 pts</strong></div>
                 <div class="regla-row-q"><span>Campeón + marcador</span><strong class="text-green">25 pts</strong></div>
                 <div class="regla-row-q"><span>Pronóstico incorrecto</span><strong style="color:#e74c3c;">0 pts</strong></div>
-                <div class="regla-row-q"><span>Consulta las reglas</span><strong style="color:#2ecc71;"></strong></div>
             </div>
-
         </aside>
     </main>
+
     <script src="./js/config.js"></script>
     <script src="./js/app.js"></script>
+    <script src="./js/grupos.js"></script>
     <script src="./js/layout.js"></script>
     <script src="./js/sesion.js"></script>
+
+    <script>
+        function cambiarVista(vista) {
+            document.getElementById('vistaPronosticos').style.display = vista === 'pronosticos' ? 'block' : 'none';
+            document.getElementById('vistaGrupos').style.display      = vista === 'grupos'      ? 'block' : 'none';
+            document.getElementById('tabPronosticos').classList.toggle('vista-tab--activo', vista === 'pronosticos');
+            document.getElementById('tabGrupos').classList.toggle('vista-tab--activo', vista === 'grupos');
+
+            // Cargar grupos solo la primera vez
+            if (vista === 'grupos' && Object.keys(standingsGlobal).length === 0) {
+                inicializarTablaGrupos();
+            }
+        }
+    </script>
 </body>
 </html>
