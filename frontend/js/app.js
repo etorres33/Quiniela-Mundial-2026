@@ -129,17 +129,6 @@ function renderizarPartidos(partidosAMostrar, pronosticosGuardados = []) {
             row.style.opacity   = "0.6";
             estadoDiv.innerHTML = `<span class="badge-estado-partido sin-plan">🔒Esperando autorización...</span>`;
 
-        } else if (memPartido === null) {
-            // El partido no está desbloqueado
-            inputLocal.readOnly = inputVisitante.readOnly = true;
-            const btnDesbloquear = document.createElement("button");
-            btnDesbloquear.className = "btn-desbloquear-partido";
-            btnDesbloquear.innerHTML = `<i class="fa-solid fa-lock-open"></i> <small>Desbloquear</small>`;
-            btnDesbloquear.addEventListener("click", () =>
-                desbloquearPartido(partido, btnDesbloquear)
-            );
-            estadoDiv.appendChild(btnDesbloquear);
-
         } else if (modRestantes === 0) {
             // Agotó las 3 modificaciones
             inputLocal.readOnly = inputVisitante.readOnly = true;
@@ -346,30 +335,7 @@ function cargarPerfilUsuario() {
 
 function actualizarPanelGoles(suscripcion, partidosDesbloqueados) {
     const panel = document.getElementById("panelGoles");
-    if (!panel) return;
-
-    if (suscripcion) {
-        panel.style.display = "block";
-        const txtPaquete = document.getElementById("txtPaquete");
-        const txtGolesRestantes = document.getElementById("txtGolesRestantes");
-        const barGoles = document.getElementById("barGoles");
-        const txtPartidosDesbloqueados = document.getElementById("txtPartidosDesbloqueados");
-
-        if (txtPaquete) txtPaquete.textContent = suscripcion.Paquete || "Plan Activo";
-        if (txtGolesRestantes) txtGolesRestantes.textContent = `${suscripcion.GolesRestantes} goles`;
-        
-        const totalDesbloqueados = partidosDesbloqueados ? partidosDesbloqueados.length : 0;
-        if (txtPartidosDesbloqueados) {
-            txtPartidosDesbloqueados.textContent = `${totalDesbloqueados} / ${suscripcion.MaxPartidos} partidos`;
-        }
-
-        if (barGoles) {
-            const pct = suscripcion.GolesIniciales > 0 ? (suscripcion.GolesRestantes / suscripcion.GolesIniciales) * 100 : 0;
-            barGoles.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-        }
-    } else {
-        panel.style.display = "none";
-    }
+    if (panel) panel.style.display = "none";
 }
 
 async function desbloquearPartido(partido, btn) {

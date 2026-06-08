@@ -240,13 +240,7 @@ function renderizarPanelSuscripciones(usuarios) {
         const userDiv = document.createElement("div");
         let estadoBadge = '<span style="color:#b8c2d6; font-size:.8rem;">Sin suscripción</span>';
         if (u.TieneSuscripcion) {
-            const pct = u.GolesIniciales > 0 ? Math.round((u.GolesRestantes / u.GolesIniciales) * 100) : 0;
-            estadoBadge = `
-                <span style="color:#2ecc71; font-size:.8rem;">✅ ${u.Paquete}</span>
-                <small style="display:block; color:#b8c2d6;">${u.GolesRestantes}/${u.GolesIniciales} goles · ${u.PartidosDesbloqueados}/${u.MaxPartidos} partidos</small>
-                <div style="background:rgba(255,255,255,.1); border-radius:4px; height:4px; margin-top:.3rem;">
-                    <div style="background:#2ecc71; width:${pct}%; height:100%; border-radius:4px;"></div>
-                </div>`;
+            estadoBadge = `<span style="color:#2ecc71; font-size:.8rem;">✅ ${u.Paquete}</span>`;
         }
         userDiv.innerHTML = `<strong>${u.Nombre}</strong><small style="display:block;color:#b8c2d6;">${u.Correo}</small>${estadoBadge}`;
 
@@ -310,71 +304,7 @@ function renderizarPanelSuscripciones(usuarios) {
 
         card.append(userDiv, ctrlDiv, btnActivar);
 
-        // ─── FILA DE RECARGA (solo si ya tiene suscripción) ──────────
-        if (u.TieneSuscripcion) {
-            const recargaDiv = document.createElement("div");
-            recargaDiv.style.cssText = "display:grid; grid-template-columns:1fr 1fr 1.5fr 1fr; gap:.5rem; align-items:center; margin-top:.8rem; padding-top:.8rem; border-top:1px solid rgba(255,255,255,.05);";
-
-            const inputGoles = document.createElement("input");
-            inputGoles.type        = "number";
-            inputGoles.min         = "1";
-            inputGoles.placeholder = "Goles a agregar";
-            inputGoles.style.cssText = "background:#0d1f33; color:white; border:1px solid rgba(52,152,219,.4); padding:.4rem .8rem; border-radius:8px;";
-
-            const inputMonto = document.createElement("input");
-            inputMonto.type        = "number";
-            inputMonto.min         = "1";
-            inputMonto.placeholder = "Monto $MXN";
-            inputMonto.style.cssText = "background:#0d1f33; color:white; border:1px solid rgba(52,152,219,.4); padding:.4rem .8rem; border-radius:8px;";
-
-            const inputNotaRecarga = document.createElement("input");
-            inputNotaRecarga.type        = "text";
-            inputNotaRecarga.placeholder = "Nota recarga (ej: Pagó $200)";
-            inputNotaRecarga.style.cssText = "background:#0d1f33; color:white; border:1px solid rgba(52,152,219,.4); padding:.4rem .8rem; border-radius:8px;";
-
-            const btnRecarga = document.createElement("button");
-            btnRecarga.innerHTML  = "➕ Recarga";
-            btnRecarga.className  = "btn-registrar-fila";
-            btnRecarga.style.cssText = "background:#3498db; color:#fff; font-weight:bold; cursor:pointer; white-space:nowrap;";
-
-            btnRecarga.addEventListener("click", async () => {
-                const goles  = parseInt(inputGoles.value);
-                const monto  = parseFloat(inputMonto.value);
-                const nota   = inputNotaRecarga.value.trim();
-                const msgEl  = document.getElementById("adminMensajeSubs");
-
-                if (!goles || goles < 1) { msgEl.textContent = "⚠️ Ingresa los goles a agregar."; msgEl.style.color = "#e74c3c"; return; }
-                if (!monto || monto < 1) { msgEl.textContent = "⚠️ Ingresa el monto pagado.";    msgEl.style.color = "#e74c3c"; return; }
-
-                try {
-                    btnRecarga.disabled = true;
-                    const res  = await fetch(`${API_URL}/api/admin/registrar-recarga`, {
-                        method: "POST", headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ idUsuario: u.IdUsuario, goles, monto, nota })
-                    });
-                    const data = await res.json();
-                    msgEl.textContent = data.message;
-                    msgEl.style.color = data.ok ? "#2ecc71" : "#e74c3c";
-                    if (data.ok) {
-                        inputGoles.value = "";
-                        inputMonto.value = "";
-                        inputNotaRecarga.value = "";
-                        setTimeout(() => inicializarPanelSuscripciones(), 1000);
-                        inicializarPanelBolsa();
-                    }
-                } catch(e) { console.error(e); }
-                finally { btnRecarga.disabled = false; }
-            });
-
-            const labelRecarga = document.createElement("small");
-            labelRecarga.textContent = "➕ Registrar recarga de Goles:";
-            labelRecarga.style.cssText = "color:#3498db; font-size:.78rem; grid-column:1/-1; margin-bottom:-.2rem;";
-
-            recargaDiv.append(labelRecarga, inputGoles, inputMonto, inputNotaRecarga, btnRecarga);
-            wrapper.append(card, recargaDiv);
-        } else {
-            wrapper.appendChild(card);
-        }
+        wrapper.appendChild(card);
 
         container.appendChild(wrapper);
     });

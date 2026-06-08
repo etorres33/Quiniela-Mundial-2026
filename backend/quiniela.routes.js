@@ -87,38 +87,21 @@ function calcularCostoGoles(ms) {
 // ─── GUARDAR QUINIELA ─────────────────────────────────────────────────────────
 router.post('/guardar-quiniela', async (req, res) => {
     try {
-        const { idUsuario, pronosticos, fechasPartidos } = req.body;
-        // fechasPartidos: { [partidoId]: "ISO string" }
+        const { idUsuario, pronosticos } = req.body;
 
         const sub = await query(
-            `SELECT s.id_suscripcion, s.goles_restantes, p.max_partidos
-             FROM suscripciones s INNER JOIN paquetes p ON s.id_paquete=p.id_paquete
+            `SELECT s.id_suscripcion
+             FROM suscripciones s
              WHERE s.id_usuario=$1 AND s.activa=TRUE`,
             [idUsuario]
         );
         if (sub.rows.length === 0)
             return res.status(403).json({ ok: false, message: '⛔ No tienes suscripción activa.' });
 
-        let { goles_restantes, id_suscripcion } = sub.rows[0];
         let errores = [], guardados = 0;
 
         for (const pro of pronosticos) {
-            // 1. Verificar desbloqueo
-            const desbloq = await query(
-                `SELECT id_desbloqueo, modificaciones_usadas, goles_gastados
-                 FROM partidos_desbloqueados WHERE id_usuario=$1 AND partido_id=$2`,
-                [idUsuario, pro.partidoId]
-            );
-            if (desbloq.rows.length === 0) { errores.push(`Partido #${pro.partidoId} no desbloqueado.`); continue; }
-
-            const { id_desbloqueo, modificaciones_usadas, goles_gastados } = desbloq.rows[0];
-
-            if (modificaciones_usadas >= 3) {
-                errores.push(`Partido #${pro.partidoId}: agotaste tus 3 modificaciones.`);
-                continue;
-            }
-
-            // 2. Calcular costo diferencial
+            // 1. Verificar fecha del partido
             const partido = partidos.find(p => p.id === pro.partidoId);
             if (!partido) {
                 errores.push(`Partido #${pro.partidoId} no encontrado.`);
@@ -134,16 +117,26 @@ router.post('/guardar-quiniela', async (req, res) => {
                 continue;
             }
 
-            const costoActual   = calcularCostoGoles(msHasta) || 1;
-            const costoExtra    = Math.max(0, costoActual - goles_gastados);
+            // 2. Verificar modificaciones
+            const desbloq = await query(
+                `SELECT id_desbloqueo, modificaciones_usadas
+                 FROM partidos_desbloqueados WHERE id_usuario=$1 AND partido_id=$2`,
+                [idUsuario, pro.partidoId]
+            );
 
-            // 3. Verificar goles suficientes
-            if (goles_restantes < costoExtra) {
-                errores.push(`Partido #${pro.partidoId}: necesitas ${costoExtra} goles extra, tienes ${goles_restantes}.`);
+            let modUsadas = 0;
+            let idDesbloqueo = null;
+            if (desbloq.rows.length > 0) {
+                modUsadas = desbloq.rows[0].modificaciones_usadas;
+                idDesbloqueo = desbloq.rows[0].id_desbloqueo;
+            }
+
+            if (modUsadas >= 3) {
+                errores.push(`Partido #${pro.partidoId}: agotaste tus 3 modificaciones.`);
                 continue;
             }
 
-            // 4. Guardar pronóstico
+            // 3. Guardar pronóstico
             await query(
                 `INSERT INTO pronosticos (id_usuario, partido_id, goles_local, goles_visitante)
                  VALUES ($1, $2, $3, $4)
@@ -151,25 +144,19 @@ router.post('/guardar-quiniela', async (req, res) => {
                 [idUsuario, pro.partidoId, pro.golesLocal, pro.golesVisitante]
             );
 
-            // 5. Descontar goles extra y actualizar goles_gastados al máximo pagado
-            if (costoExtra > 0) {
-                goles_restantes -= costoExtra;
+            // 4. Incrementar modificaciones
+            if (idDesbloqueo) {
                 await query(
-                    `UPDATE suscripciones SET goles_restantes=goles_restantes-$1 WHERE id_suscripcion=$2`,
-                    [costoExtra, id_suscripcion]
+                    `UPDATE partidos_desbloqueados SET modificaciones_usadas=modificaciones_usadas+1 WHERE id_desbloqueo=$1`,
+                    [idDesbloqueo]
                 );
-                // Actualizar goles_gastados al nuevo máximo (costoActual)
+            } else {
                 await query(
-                    `UPDATE partidos_desbloqueados SET goles_gastados=$1 WHERE id_desbloqueo=$2`,
-                    [costoActual, id_desbloqueo]
+                    `INSERT INTO partidos_desbloqueados (id_usuario, partido_id, modificaciones_usadas, goles_gastados)
+                     VALUES ($1, $2, 1, 0)`,
+                    [idUsuario, pro.partidoId]
                 );
             }
-
-            // 6. Incrementar modificaciones
-            await query(
-                `UPDATE partidos_desbloqueados SET modificaciones_usadas=modificaciones_usadas+1 WHERE id_desbloqueo=$1`,
-                [id_desbloqueo]
-            );
 
             guardados++;
         }
@@ -183,7 +170,7 @@ router.post('/guardar-quiniela', async (req, res) => {
             ? `⚠️ No se pudo guardar: ${errores.join(' | ')}`
             : `✅ Pronóstico guardado correctamente.`;
 
-        return res.json({ ok: guardados > 0, message: msg, golesRestantes: goles_restantes });
+        return res.json({ ok: guardados > 0, message: msg });
 
     } catch (error) {
         console.error(error);
@@ -236,67 +223,9 @@ router.get('/mis-datos/:idUsuario', async (req, res) => {
     }
 });
 
-// ─── DESBLOQUEAR PARTIDO ──────────────────────────────────────────────────────
+// ─── DESBLOQUEAR PARTIDO (DEPRECATED) ──────────────────────────────────────────
 router.post('/desbloquear-partido', async (req, res) => {
-    try {
-        const { idUsuario, partidoId } = req.body;
-        if (!idUsuario || !partidoId)
-            return res.status(400).json({ ok: false, message: 'Datos incompletos.' });
-
-        const sub = await query(
-            `SELECT s.id_suscripcion, s.goles_restantes, p.max_partidos
-             FROM suscripciones s INNER JOIN paquetes p ON s.id_paquete=p.id_paquete
-             WHERE s.id_usuario=$1 AND s.activa=TRUE`,
-            [idUsuario]
-        );
-        if (sub.rows.length === 0)
-            return res.status(403).json({ ok: false, message: '⛔ No tienes suscripción activa.' });
-
-        const { id_suscripcion, goles_restantes, max_partidos } = sub.rows[0];
-
-        const total = await query(`SELECT COUNT(*) FROM partidos_desbloqueados WHERE id_usuario=$1`, [idUsuario]);
-        if (parseInt(total.rows[0].count) >= max_partidos)
-            return res.status(403).json({ ok: false, message: `⛔ Ya alcanzaste el límite (${max_partidos} partidos).` });
-
-        const partido = partidos.find(p => p.id === partidoId);
-        if (!partido)
-            return res.status(404).json({ ok: false, message: 'Partido no encontrado.' });
-
-        const horaLimpia   = partido.hora.replace(" hrs", "");
-        const fechaPartido = new Date(`${partido.fecha} ${horaLimpia}:00 GMT-0600`);
-        const ms    = fechaPartido.getTime() - Date.now();
-        const costo = calcularCostoGoles(ms);
-        if (costo === null)
-            return res.status(403).json({ ok: false, message: '⛔ El partido ya empezó.' });
-        if (goles_restantes < costo)
-            return res.status(403).json({ ok: false, message: `⛔ Necesitas ${costo} goles, tienes ${goles_restantes}.` });
-
-        const yaDesb = await query(
-            `SELECT 1 FROM partidos_desbloqueados WHERE id_usuario=$1 AND partido_id=$2`,
-            [idUsuario, partidoId]
-        );
-        if (yaDesb.rows.length > 0)
-            return res.status(409).json({ ok: false, message: 'Partido ya desbloqueado.' });
-
-        await query(
-            `UPDATE suscripciones SET goles_restantes=goles_restantes-$1 WHERE id_suscripcion=$2`,
-            [costo, id_suscripcion]
-        );
-        await query(
-            `INSERT INTO partidos_desbloqueados (id_usuario, partido_id, goles_gastados) VALUES ($1, $2, $3)`,
-            [idUsuario, partidoId, costo]
-        );
-
-        return res.json({
-            ok: true,
-            message: `🔓 Partido desbloqueado. Gastaste ${costo} gol(es). Te quedan ${goles_restantes - costo}.`,
-            golesRestantes: goles_restantes - costo,
-            costo
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ ok: false, message: 'Error al desbloquear.' });
-    }
+    return res.json({ ok: true, message: 'Desbloqueo automático activo.' });
 });
 
 // ─── GUARDAR RESULTADO OFICIAL ────────────────────────────────────────────────
@@ -524,7 +453,7 @@ router.get('/campeon/:idUsuario', async (req, res) => {
 // ─── PAQUETES ────────────────────────────────────────────────────────────────
 router.get('/paquetes', async (req, res) => {
     try {
-        const result = await query(`SELECT id_paquete AS "IdPaquete", nombre AS "Nombre", precio AS "Precio", goles AS "Goles", max_partidos AS "MaxPartidos" FROM paquetes ORDER BY precio DESC`);
+        const result = await query(`SELECT id_paquete AS "IdPaquete", nombre AS "Nombre", precio AS "Precio", goles AS "Goles", max_partidos AS "MaxPartidos" FROM paquetes WHERE nombre='Premium'`);
         return res.json({ ok: true, paquetes: result.rows });
     } catch (error) {
         return res.status(500).json({ ok: false, message: 'Error.' });
