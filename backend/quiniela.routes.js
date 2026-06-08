@@ -26,6 +26,27 @@ async function registrarLogActividad({ idUsuario, accion, partidoId, detalle, ex
     }
 }
 
+const crypto = require('crypto');
+
+function validarTokenAdmin(req, res, next) {
+    const token = req.headers['x-admin-token'] || req.query.adminToken;
+    if (!token) {
+        return res.status(401).json({ ok: false, message: 'No autorizado.' });
+    }
+
+    const secret = process.env.ADMIN_SECRET || "default-admin-secret-2026-torreslab";
+    const expectedToken = crypto.createHmac('sha256', secret).update('1').digest('hex');
+
+    if (token !== expectedToken) {
+        return res.status(401).json({ ok: false, message: 'Acceso denegado.' });
+    }
+
+    next();
+}
+
+// Proteger todas las rutas administrativas
+router.use('/admin', validarTokenAdmin);
+
 // ─── NODEMAILER ───────────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -291,7 +312,7 @@ router.post('/desbloquear-partido', async (req, res) => {
 });
 
 // ─── GUARDAR RESULTADO OFICIAL ────────────────────────────────────────────────
-router.post('/guardar-resultado', async (req, res) => {
+router.post('/guardar-resultado', validarTokenAdmin, async (req, res) => {
     try {
         const { partidoId, golesLocal, golesVisitante, local, visitante } = req.body;
         resultadoRealSchema.parse({ partidoId, golesLocal, golesVisitante });
@@ -346,7 +367,7 @@ router.get('/obtener-resultados', async (req, res) => {
 });
 
 // ─── CALCULAR PUNTOS ──────────────────────────────────────────────────────────
-router.post('/calcular-puntos', async (req, res) => {
+router.post('/calcular-puntos', validarTokenAdmin, async (req, res) => {
     try {
         const pros = await query(
             `SELECT p.id_usuario, p.goles_local AS pro_local, p.goles_visitante AS pro_visitante,
@@ -918,6 +939,17 @@ router.get('/admin/logs', async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ ok: false, message: 'Error al obtener logs.' });
+    }
+});
+
+router.post('/admin/sincronizar', async (req, res) => {
+    try {
+        const { sincronizarResultados } = require('./sync-resultados');
+        await sincronizarResultados();
+        return res.json({ ok: true, message: '✅ Sincronización manual completada con éxito.' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al sincronizar.' });
     }
 });
 

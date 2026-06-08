@@ -100,6 +100,13 @@ app.post("/api/login", async (req, res) => {
         if (!passwordCorrecta)
             return res.status(401).json({ ok: false, message: "Correo o contraseña incorrectos" });
 
+        let adminToken = null;
+        if (usuario.id_usuario === 1) {
+            const crypto = require('crypto');
+            const secret = process.env.ADMIN_SECRET || "default-admin-secret-2026-torreslab";
+            adminToken = crypto.createHmac('sha256', secret).update(String(usuario.id_usuario)).digest('hex');
+        }
+
         res.json({
             ok: true,
             message: "Login correcto",
@@ -108,7 +115,8 @@ app.post("/api/login", async (req, res) => {
                 nombre:    usuario.nombre,
                 correo:    usuario.correo,
                 fotoUrl:   usuario.foto_url
-            }
+            },
+            adminToken
         });
 
     } catch (error) {
