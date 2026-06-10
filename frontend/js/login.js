@@ -29,14 +29,14 @@ btnEntrar.addEventListener("click", async function () {
             })
         });
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.message || `Servidor respondió con código ${response.status}`);
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonErr) {
+            throw new Error(`Servidor respondió con código ${response.status}`);
         }
 
-        const data = await response.json();
-
-        if (data.ok) {
+        if (response.ok && data.ok) {
             mensaje.textContent = "Inicio de sesión correcto";
             mensaje.className = "mensaje success";
             mensaje.style.color = "";
