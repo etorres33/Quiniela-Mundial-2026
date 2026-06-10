@@ -55,6 +55,28 @@ async function query(text, params) {
             ALTER TABLE usuarios ALTER COLUMN foto_url TYPE TEXT;
         `);
         console.log('✅ Columna foto_url modificada a TEXT.');
+
+        // Crear tabla de configuración de la bolsa si no existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS config_bolsa (
+                clave                VARCHAR(50)   NOT NULL PRIMARY KEY,
+                valor                DECIMAL(5,2)  NOT NULL,
+                fecha_actualizacion  TIMESTAMP     DEFAULT NOW(),
+                actualizado_por      VARCHAR(100)
+            );
+        `);
+        console.log('✅ Tabla config_bolsa verificada/creada.');
+
+        // Insertar valores predeterminados de distribución de la bolsa
+        await pool.query(`
+            INSERT INTO config_bolsa (clave, valor) VALUES
+                ('PctAdmin',   15.00),
+                ('PctPremio1', 50.00),
+                ('PctPremio2', 30.00),
+                ('PctPremio3', 20.00)
+            ON CONFLICT (clave) DO NOTHING;
+        `);
+        console.log('✅ Valores iniciales de config_bolsa verificados/insertados.');
     } catch (err) {
         console.error('❌ Error al verificar/crear tabla/columna:', err);
     }

@@ -704,13 +704,24 @@ router.get('/admin/bolsa', async (req, res) => {
              FROM suscripciones s INNER JOIN bolsa b ON b.id_usuario=s.id_usuario WHERE s.activa=TRUE`
         );
 
+        const configBolsaResult = await query(`SELECT clave, valor FROM config_bolsa`);
+        const configBolsa = {};
+        configBolsaResult.rows.forEach(r => {
+            configBolsa[r.clave] = parseFloat(r.valor);
+        });
+
+        const pctAdmin   = configBolsa['PctAdmin']   ?? 15.00;
+        const pctPremio1 = configBolsa['PctPremio1'] ?? 50.00;
+        const pctPremio2 = configBolsa['PctPremio2'] ?? 30.00;
+        const pctPremio3 = configBolsa['PctPremio3'] ?? 20.00;
+
         const totalRecaudado     = parseFloat(insResult.rows[0].total_recaudado) || 0;
         const totalParticipantes = parseInt(insResult.rows[0].total_participantes) || 0;
-        const bolsaPremios       = totalRecaudado * 0.85;
-        const cuotaAdmin         = totalRecaudado * 0.15;
-        const premio1 = bolsaPremios * 0.50;
-        const premio2 = bolsaPremios * 0.30;
-        const premio3 = bolsaPremios * 0.20;
+        const cuotaAdmin         = totalRecaudado * (pctAdmin / 100);
+        const bolsaPremios       = totalRecaudado - cuotaAdmin;
+        const premio1 = bolsaPremios * (pctPremio1 / 100);
+        const premio2 = bolsaPremios * (pctPremio2 / 100);
+        const premio3 = bolsaPremios * (pctPremio3 / 100);
 
         const rankingResult = await query(`
             SELECT u.id_usuario AS "IdUsuario", u.nombre AS "Nombre",
@@ -730,7 +741,7 @@ router.get('/admin/bolsa', async (req, res) => {
         if (pos1.length>1)      distribucion=[...combinar(pos1,[premio1,premio2]),...combinar(pos2.length?pos2:pos3,[premio3])];
         else if (pos2.length>1) distribucion=[...combinar(pos1,[premio1]),...combinar(pos2,[premio2,premio3])];
         else if (pos3.length>1) distribucion=[...combinar(pos1,[premio1]),...combinar(pos2,[premio2]),...combinar(pos3,[premio3])];
-        else distribucion=[...(pos1[0]?[{...pos1[0],montoPremio:premio1,porcentaje:'50.00'}]:[]),...(pos2[0]?[{...pos2[0],montoPremio:premio2,porcentaje:'30.00'}]:[]),...(pos3[0]?[{...pos3[0],montoPremio:premio3,porcentaje:'20.00'}]:[])];
+        else distribucion=[...(pos1[0]?[{...pos1[0],montoPremio:premio1,porcentaje:pctPremio1.toFixed(2)}]:[]),...(pos2[0]?[{...pos2[0],montoPremio:premio2,porcentaje:pctPremio2.toFixed(2)}]:[]),...(pos3[0]?[{...pos3[0],montoPremio:premio3,porcentaje:pctPremio3.toFixed(2)}]:[])];
 
         return res.json({ ok:true, totalRecaudado, totalParticipantes, bolsaPremios, cuotaAdmin, premio1, premio2, premio3, distribucion, ranking });
     } catch (error) {
@@ -769,10 +780,24 @@ router.post('/admin/revelar-ganadores', async (req, res) => {
         if (config.rows[0]?.valor === '1')
             return res.status(409).json({ ok: false, message: '⚠️ Los ganadores ya fueron revelados.' });
 
+        const configBolsaResult = await query(`SELECT clave, valor FROM config_bolsa`);
+        const configBolsa = {};
+        configBolsaResult.rows.forEach(r => {
+            configBolsa[r.clave] = parseFloat(r.valor);
+        });
+
+        const pctAdmin   = configBolsa['PctAdmin']   ?? 15.00;
+        const pctPremio1 = configBolsa['PctPremio1'] ?? 50.00;
+        const pctPremio2 = configBolsa['PctPremio2'] ?? 30.00;
+        const pctPremio3 = configBolsa['PctPremio3'] ?? 20.00;
+
         const bolsaR  = await query(`SELECT COALESCE(SUM(monto),0) AS total FROM bolsa`);
         const totalRecaudado = parseFloat(bolsaR.rows[0].total) || 0;
-        const bolsaPremios   = totalRecaudado * 0.85;
-        const premio1 = bolsaPremios*0.50, premio2 = bolsaPremios*0.30, premio3 = bolsaPremios*0.20;
+        const cuotaAdmin         = totalRecaudado * (pctAdmin / 100);
+        const bolsaPremios       = totalRecaudado - cuotaAdmin;
+        const premio1 = bolsaPremios * (pctPremio1 / 100);
+        const premio2 = bolsaPremios * (pctPremio2 / 100);
+        const premio3 = bolsaPremios * (pctPremio3 / 100);
 
         const rankingResult = await query(`
             SELECT u.id_usuario AS "IdUsuario", u.nombre AS "Nombre",
