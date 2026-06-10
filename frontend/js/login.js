@@ -66,7 +66,7 @@ btnEntrar.addEventListener("click", async function () {
         }
     } catch (error) {
         console.error("Error al iniciar sesión:", error);
-        mensaje.textContent = "Error de conexión con el servidor. Inténtalo en un momento.";
+        mensaje.textContent = `Error: ${error.message || error}`;
         mensaje.className = "mensaje error";
         mensaje.style.color = "";
         btnEntrar.disabled = false;
