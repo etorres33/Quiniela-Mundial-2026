@@ -475,6 +475,35 @@ async function enviarPronosticosAntesDePartido() {
                             csvContent += `${escapeCSV(row.Usuario)},${escapeCSV(row.Correo)},${row.PartidoId},${escapeCSV(matchName)},${row.PronosticoLocal},${row.PronosticoVisitante},${row.Modificaciones}\n`;
                         }
 
+                        // Generar imagen de los pronósticos de los participantes utilizando QuickChart Table API
+                        let predictionsChartUrl = null;
+                        if (result.rows.length > 0) {
+                            const predictionsDataSource = result.rows.map(row => ({
+                                "Usuario": row.Usuario,
+                                "Correo": row.Correo,
+                                "Pronostico": `${row.PronosticoLocal} - ${row.PronosticoVisitante}`,
+                                "Cambios": String(row.Modificaciones)
+                            }));
+
+                            const tableConfig = {
+                                title: `PRONÓSTICOS: ${match.local.toUpperCase()} VS ${match.visitante.toUpperCase()}`,
+                                columns: [
+                                    { title: "Usuario", dataIndex: "Usuario", width: 180 },
+                                    { title: "Correo", dataIndex: "Correo", width: 220 },
+                                    { title: "Pronóstico", dataIndex: "Pronostico", width: 100, align: "center" },
+                                    { title: "Cambios", dataIndex: "Cambios", width: 80, align: "center" }
+                                ],
+                                dataSource: predictionsDataSource,
+                                options: {
+                                    backgroundColor: "#ffffff",
+                                    fontFamily: "sans-serif",
+                                    paddingVertical: 15,
+                                    paddingHorizontal: 15
+                                }
+                            };
+                            predictionsChartUrl = `https://api.quickchart.io/v1/table?data=${encodeURIComponent(JSON.stringify(tableConfig))}`;
+                        }
+
                         // Generar imagen de ranking actual (Top 10) utilizando QuickChart
                         const rankingResult = await query(`
                             SELECT u.nombre AS "Nombre", COALESCE(p.puntos_totales, 0) AS "Puntos"
@@ -569,6 +598,14 @@ async function enviarPronosticosAntesDePartido() {
                                     </table>
                                 </div>
                                 
+                                ${predictionsChartUrl ? `
+                                <div style="margin:2rem 0;text-align:center;border-top:1px solid rgba(255,255,255,.1);padding-top:1.5rem;">
+                                    <h4 style="color:#b8c2d6;margin-bottom:0.8rem;text-transform:uppercase;font-size:0.85rem;letter-spacing:1px;">📋 Tabla de Pronósticos de Participantes</h4>
+                                    <img src="${predictionsChartUrl}" alt="Tabla de Pronósticos" style="max-width:100%;border-radius:12px;border:1px solid #1f2d3d;display:block;margin:0 auto;" />
+                                    <p style="font-size:0.75rem;color:#b8c2d6;margin-top:0.6rem;">💡 Guarda la imagen adjunta para compartir los pronósticos en tu grupo de mensajería (WhatsApp/Telegram).</p>
+                                </div>
+                                ` : ''}
+
                                 ${rankingChartUrl ? `
                                 <div style="margin:2rem 0;text-align:center;border-top:1px solid rgba(255,255,255,.1);padding-top:1.5rem;">
                                     <h4 style="color:#b8c2d6;margin-bottom:0.8rem;text-transform:uppercase;font-size:0.85rem;letter-spacing:1px;">🏆 Tabla de Posiciones Actual (Top 10)</h4>
@@ -578,7 +615,7 @@ async function enviarPronosticosAntesDePartido() {
                                 ` : ''}
 
                                 <p style="font-size:0.85rem;color:#b8c2d6;border-top:1px solid rgba(255,255,255,.1);padding-top:1rem;">
-                                    Se adjunta el reporte en formato CSV para su uso en Excel (codificación UTF-8 para acentos y caracteres especiales) y la gráfica de tabla general actual.
+                                    Se adjunta el reporte en formato CSV para su uso en Excel (codificación UTF-8 para acentos y caracteres especiales), la gráfica de la tabla de posiciones general actual y la imagen de la tabla de pronósticos.
                                 </p>
                             </div>
                             <div style="background:rgba(0,0,0,.3);padding:1rem;text-align:center;">
@@ -598,6 +635,13 @@ async function enviarPronosticosAntesDePartido() {
                             mailAttachments.push({
                                 filename: 'Ranking_Actual_Top_10.png',
                                 path: rankingChartUrl
+                            });
+                        }
+
+                        if (predictionsChartUrl) {
+                            mailAttachments.push({
+                                filename: `Tabla_Pronosticos_Partido_${match.id}.png`,
+                                path: predictionsChartUrl
                             });
                         }
 
