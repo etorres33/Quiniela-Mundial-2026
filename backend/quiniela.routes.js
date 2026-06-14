@@ -8,6 +8,15 @@ const fs         = require('fs');
 
 let partidos = [];
 try {
+    // Migración automática de base de datos
+    (async () => {
+        try {
+            await query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultima_conexion TIMESTAMP DEFAULT NOW()`);
+        } catch (err) {
+            console.error('⚠️ Error al agregar columna ultima_conexion:', err.message);
+        }
+    })();
+
     const dataPath = path.join(__dirname, 'data', 'partidos.json');
     partidos = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 } catch (err) {
@@ -369,6 +378,31 @@ router.get('/mis-datos/:idUsuario', validarTokenUsuario, async (req, res) => {
         });
     } catch (error) {
         return res.status(500).json({ ok: false, message: 'Error al obtener datos.' });
+    }
+});
+
+// ─── PRESENCIA DE USUARIOS (HEARTBEAT) ────────────────────────────────────────
+router.post('/heartbeat', async (req, res) => {
+    try {
+        const { idUsuario } = req.body;
+        if (idUsuario) {
+            await query(
+                `UPDATE usuarios SET ultima_conexion = NOW() WHERE id_usuario = $1`,
+                [parseInt(idUsuario)]
+            );
+        }
+
+        const activeUsers = await query(
+            `SELECT id_usuario AS "idUsuario", nombre AS "nombre", foto_url AS "fotoUrl"
+             FROM usuarios
+             WHERE ultima_conexion >= NOW() - INTERVAL '2 minutes' AND activo = TRUE
+             ORDER BY nombre ASC`
+        );
+
+        return res.json({ ok: true, activeUsers: activeUsers.rows });
+    } catch (error) {
+        console.error('Error in heartbeat route:', error);
+        return res.status(500).json({ ok: false, message: 'Error en el servidor.' });
     }
 });
 
