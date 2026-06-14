@@ -219,7 +219,23 @@ router.post('/guardar-quiniela', validarTokenUsuario, async (req, res) => {
                 continue;
             }
 
-            // 2. Verificar modificaciones
+            // 1.5. Verificar si el pronóstico existente es idéntico al nuevo
+            const existing = await query(
+                `SELECT goles_local, goles_visitante FROM pronosticos
+                 WHERE id_usuario = $1 AND partido_id = $2`,
+                [idUsuario, pro.partidoId]
+            );
+
+            let scoreChanged = true;
+            if (existing.rows.length > 0) {
+                const oldLocal = existing.rows[0].goles_local;
+                const oldVisitante = existing.rows[0].goles_visitante;
+                if (oldLocal === pro.golesLocal && oldVisitante === pro.golesVisitante) {
+                    scoreChanged = false;
+                }
+            }
+
+            // 2. Verificar modificaciones (solo si el marcador cambió)
             const desbloq = await query(
                 `SELECT id_desbloqueo, modificaciones_usadas
                  FROM partidos_desbloqueados WHERE id_usuario=$1 AND partido_id=$2`,
@@ -233,7 +249,7 @@ router.post('/guardar-quiniela', validarTokenUsuario, async (req, res) => {
                 idDesbloqueo = desbloq.rows[0].id_desbloqueo;
             }
 
-            if (modUsadas >= 3) {
+            if (scoreChanged && modUsadas >= 3) {
                 const errMsg = 'Agotaste tus 3 modificaciones.';
                 errores.push(`Partido #${pro.partidoId}: ${errMsg}`);
                 await registrarLogActividad({
@@ -255,18 +271,20 @@ router.post('/guardar-quiniela', validarTokenUsuario, async (req, res) => {
                 [idUsuario, pro.partidoId, pro.golesLocal, pro.golesVisitante]
             );
 
-            // 4. Incrementar modificaciones
-            if (idDesbloqueo) {
-                await query(
-                    `UPDATE partidos_desbloqueados SET modificaciones_usadas=modificaciones_usadas+1 WHERE id_desbloqueo=$1`,
-                    [idDesbloqueo]
-                );
-            } else {
-                await query(
-                    `INSERT INTO partidos_desbloqueados (id_usuario, partido_id, modificaciones_usadas, goles_gastados)
-                     VALUES ($1, $2, 0, 0)`,
-                    [idUsuario, pro.partidoId]
-                );
+            // 4. Incrementar modificaciones (solo si el marcador cambió)
+            if (scoreChanged) {
+                if (idDesbloqueo) {
+                    await query(
+                        `UPDATE partidos_desbloqueados SET modificaciones_usadas=modificaciones_usadas+1 WHERE id_desbloqueo=$1`,
+                        [idDesbloqueo]
+                    );
+                } else {
+                    await query(
+                        `INSERT INTO partidos_desbloqueados (id_usuario, partido_id, modificaciones_usadas, goles_gastados)
+                         VALUES ($1, $2, 1, 0)`,
+                        [idUsuario, pro.partidoId]
+                    );
+                }
             }
 
             await registrarLogActividad({
