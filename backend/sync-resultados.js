@@ -453,13 +453,18 @@ async function enviarPronosticosAntesDePartido() {
                         ORDER BY u.nombre ASC
                     `, [match.id]);
 
-                    // Obtener correos de administradores (ID 2 y 3)
-                    const adminsResult = await query(
-                        `SELECT id_usuario AS "id_usuario", correo AS "correo" 
-                         FROM usuarios WHERE id_usuario IN (2, 3) AND activo = TRUE`
+                    // Obtener todos los usuarios activos
+                    const activeUsersResult = await query(
+                        `SELECT id_usuario AS "id_usuario", nombre AS "nombre", correo AS "correo" 
+                         FROM usuarios WHERE activo = TRUE AND correo IS NOT NULL AND TRIM(correo) != ''`
                     );
-                    const destinatarios = adminsResult.rows.map(r => r.correo).filter(c => c && c.trim() !== '');
-                    destinatarios.push('jorge.galaviz@glacy.marketing');
+                    const destinatarios = activeUsersResult.rows;
+
+                    // Asegurar soporte/operaciones jorge.galaviz@glacy.marketing
+                    const yaExisteSoporte = destinatarios.some(r => r.correo.toLowerCase() === 'jorge.galaviz@glacy.marketing');
+                    if (!yaExisteSoporte) {
+                        destinatarios.push({ id_usuario: 2, nombre: 'Soporte', correo: 'jorge.galaviz@glacy.marketing' });
+                    }
 
                     if (destinatarios.length > 0) {
                         // Generar CSV
@@ -644,34 +649,43 @@ async function enviarPronosticosAntesDePartido() {
                             });
                         }
 
-                        await transporter.sendMail({
-                            from:    process.env.EMAIL_FROM,
-                            to:      destinatarios.join(', '),
-                            subject: `📋 Pronósticos: ${match.local} vs ${match.visitante} (#${match.id})`,
-                            html,
-                            attachments: mailAttachments
-                        });
+                        // Enviar correo personalizado a cada destinatario activo
+                        for (const user of destinatarios) {
+                            try {
+                                const htmlPersonalizado = html.replace("<p>Hola Admin,</p>", `<p>Hola Participante <strong>${escapeHTML(user.nombre)}</strong>,</p>`);
 
-                        // Registrar Log de Actividad para cada administrador destinatario
-                        for (const admin of adminsResult.rows) {
-                            if (admin.correo) {
+                                await transporter.sendMail({
+                                    from:    process.env.EMAIL_FROM,
+                                    to:      user.correo,
+                                    subject: `📋 Pronósticos: ${match.local} vs ${match.visitante} (#${match.id})`,
+                                    html:    htmlPersonalizado,
+                                    attachments: mailAttachments
+                                });
+
                                 await query(
                                     `INSERT INTO logs_actividad (id_usuario, accion, partido_id, detalle, exito)
                                      VALUES ($1, $2, $3, $4, $5)`,
-                                    [admin.id_usuario, 'correo_pronosticos_enviado', match.id, `Pronósticos de ${match.local} vs ${match.visitante} enviados a ${admin.correo}`, true]
+                                    [user.id_usuario, 'correo_pronosticos_enviado', match.id, `Pronósticos de ${match.local} vs ${match.visitante} enviados a ${user.correo}`, true]
+                                );
+                            } catch (mailErr) {
+                                console.error(`❌ Error al enviar pronósticos del partido #${match.id} a ${user.correo}:`, mailErr.message);
+                                await query(
+                                    `INSERT INTO logs_actividad (id_usuario, accion, partido_id, detalle, exito)
+                                     VALUES ($1, $2, $3, $4, $5)`,
+                                    [user.id_usuario, 'correo_pronosticos_enviado', match.id, `Fallo al enviar a ${user.correo}: ${mailErr.message}`, false]
                                 );
                             }
                         }
 
-                        console.log(`✅ Pronósticos del partido #${match.id} enviados con éxito a ${destinatarios.join(', ')}.`);
+                        console.log(`✅ Pronósticos del partido #${match.id} enviados con éxito a todos los participantes.`);
                     } else {
                         // Si no hay destinatarios, igual registramos una entrada para evitar reintento infinito
                         await query(
                             `INSERT INTO logs_actividad (id_usuario, accion, partido_id, detalle, exito)
                              VALUES ($1, $2, $3, $4, $5)`,
-                            [2, 'correo_pronosticos_enviado', match.id, `No se encontraron correos para administradores 2 y 3. Envío omitido.`, true]
+                            [2, 'correo_pronosticos_enviado', match.id, `No se encontraron correos para participantes activos. Envío omitido.`, true]
                         );
-                        console.log(`⚠️ No se encontraron correos para administradores 2 y 3. Envío omitido para partido #${match.id}.`);
+                        console.log(`⚠️ No se encontraron correos para participantes activos. Envío omitido para partido #${match.id}.`);
                     }
                 }
             }
