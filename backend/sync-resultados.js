@@ -63,8 +63,7 @@ const traductoresEquipos = {
     "croatia": "croacia",
     "panama": "panama",
     "uzbekistan": "uzbekistan",
-    "colombia": "colombia",
-    "gambia": "gambia"
+    "colombia": "colombia"
 };
 
 function normalizarTexto(str) {

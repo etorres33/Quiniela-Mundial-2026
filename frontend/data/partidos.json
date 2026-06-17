@@ -33,7 +33,7 @@
   { "id": 32, "grupo": "D", "fecha": "19 Jun 2026", "hora": "21:00 hrs", "local": "Turquía", "codLocal": "TR", "visitante": "Paraguay", "codVisitante": "PY" },
   { "id": 33, "grupo": "F", "fecha": "20 Jun 2026", "hora": "11:00 hrs", "local": "Países Bajos", "codLocal": "NL", "visitante": "Suecia", "codVisitante": "SE" },
   { "id": 34, "grupo": "E", "fecha": "20 Jun 2026", "hora": "14:00 hrs", "local": "Alemania", "codLocal": "DE", "visitante": "Costa de Marfil", "codVisitante": "CI" },
-  { "id": 35, "grupo": "E", "fecha": "20 Jun 2026", "hora": "18:00 hrs", "local": "Gambia", "codLocal": "GM", "visitante": "Ecuador", "codVisitante": "EC" },
+  { "id": 35, "grupo": "E", "fecha": "20 Jun 2026", "hora": "18:00 hrs", "local": "Curazao", "codLocal": "CW", "visitante": "Ecuador", "codVisitante": "EC" },
   { "id": 36, "grupo": "F", "fecha": "20 Jun 2026", "hora": "22:00 hrs", "local": "Túnez", "codLocal": "TN", "visitante": "Japón", "codVisitante": "JP" },
   { "id": 37, "grupo": "H", "fecha": "21 Jun 2026", "hora": "10:00 hrs", "local": "España", "codLocal": "ES", "visitante": "Arabia Saudita", "codVisitante": "SA" },
   { "id": 38, "grupo": "G", "fecha": "21 Jun 2026", "hora": "13:00 hrs", "local": "Bélgica", "codLocal": "BE", "visitante": "Irán", "codVisitante": "IR" },
