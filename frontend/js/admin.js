@@ -80,8 +80,7 @@ function renderizarPartidosAdmin(lista) {
         const gV  = partido.resultadoVisitante !== undefined ? partido.resultadoVisitante : (reg ? reg.GolesVisitante : "");
 
         const row = document.createElement("div");
-        row.className = "quiniela-row";
-        row.style.gridTemplateColumns = "1.5fr 1fr .8fr 0.8fr";
+        row.className = "quiniela-row admin-partido-row-grid";
 
         const matchDiv = document.createElement("div"); matchDiv.className = "match";
         const numSpan  = document.createElement("span"); numSpan.className = "num"; numSpan.textContent = partido.id;

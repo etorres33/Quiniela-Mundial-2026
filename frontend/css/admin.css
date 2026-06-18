@@ -329,7 +329,8 @@ body{
     .bolsa-premios-base-grid, 
     .sub-row-grid, 
     .pendiente-row-grid, 
-    .campeon-real-grid {
+    .campeon-real-grid,
+    .admin-partido-row-grid {
         grid-template-columns: 1fr !important;
         gap: 1rem;
         text-align: center;
@@ -343,6 +344,14 @@ body{
 
     .pendiente-row-grid div {
         text-align: center;
+    }
+
+    .btn-enviar {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 1rem 0;
+        font-size: 0.95rem;
+        padding: 0.8rem;
     }
 }
 
@@ -383,5 +392,11 @@ body{
     grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 1rem;
     align-items: end;
+}
+
+.admin-partido-row-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr .8fr 0.8fr;
+    align-items: center;
 }
 
