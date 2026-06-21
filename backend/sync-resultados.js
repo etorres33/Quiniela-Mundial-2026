@@ -283,20 +283,40 @@ async function sincronizarResultados() {
             const nombreLocal    = match.homeTeam.name;
             const nombreVisitante = match.awayTeam.name;
 
-            // Intentar encontrar el ID del partido local por coincidencia de nombres
+            // Intentar encontrar el ID del partido por coincidencia de nombres
             const localAPI = obtenerNombreNormalizado(nombreLocal);
             const visitanteAPI = obtenerNombreNormalizado(nombreVisitante);
 
+            let esInvertido = false;
             const partidoEncontrado = todosLosPartidos.find(p => {
                 const localJSON = normalizarTexto(p.local);
                 const visitanteJSON = normalizarTexto(p.visitante);
                 
-                return (localJSON.includes(localAPI) || localAPI.includes(localJSON)) &&
-                       (visitanteJSON.includes(visitanteAPI) || visitanteAPI.includes(visitanteJSON));
+                // Comparación directa (caso normal)
+                const coincidenciaNormal = (localJSON.includes(localAPI) || localAPI.includes(localJSON)) &&
+                                           (visitanteJSON.includes(visitanteAPI) || visitanteAPI.includes(visitanteJSON));
+                if (coincidenciaNormal) {
+                    esInvertido = false;
+                    return true;
+                }
+
+                // Comparación cruzada (caso invertido: local con visitante y visitante con local)
+                const coincidenciaInvertida = (localJSON.includes(visitanteAPI) || visitanteAPI.includes(localJSON)) &&
+                                               (visitanteJSON.includes(localAPI) || localAPI.includes(visitanteJSON));
+                if (coincidenciaInvertida) {
+                    esInvertido = true;
+                    return true;
+                }
+
+                return false;
             });
 
             if (partidoEncontrado) {
                 const partidoId = partidoEncontrado.id;
+
+                // Si están invertidos los equipos en la API, invertimos los goles para asociarlos correctamente a los equipos locales/visitantes locales
+                const golesLocalFinal = esInvertido ? golesVisitante : golesLocal;
+                const golesVisitanteFinal = esInvertido ? golesLocal : golesVisitante;
 
                 // 1. Verificar si ya fue validado en resultados_reales
                 const yaExisteReal = await query(
@@ -309,13 +329,13 @@ async function sincronizarResultados() {
                     continue;
                 }
 
-                console.log(`⚡ Auto-validando partido #${partidoId}: ${partidoEncontrado.local} vs ${partidoEncontrado.visitante} (${golesLocal}-${golesVisitante})`);
+                console.log(`⚡ Auto-validando partido #${partidoId}: ${partidoEncontrado.local} vs ${partidoEncontrado.visitante} (${golesLocalFinal}-${golesVisitanteFinal})`);
 
                 // 2. Insertar en resultados_reales
                 await query(
                     `INSERT INTO resultados_reales (partido_id, goles_local, goles_visitante) VALUES ($1, $2, $3)
                      ON CONFLICT (partido_id) DO UPDATE SET goles_local=$2, goles_visitante=$3`,
-                    [partidoId, golesLocal, golesVisitante]
+                    [partidoId, golesLocalFinal, golesVisitanteFinal]
                 );
 
                 // 3. Registrar en resultados_pendientes como ya validado
@@ -329,7 +349,7 @@ async function sincronizarResultados() {
                         `UPDATE resultados_pendientes 
                          SET validado=TRUE, fecha_validacion=NOW(), partido_id=$1, goles_local=$2, goles_visitante=$3
                          WHERE fixture_id=$4`,
-                        [partidoId, golesLocal, golesVisitante, match.id]
+                        [partidoId, golesLocalFinal, golesVisitanteFinal, match.id]
                     );
                 } else {
                     await query(
@@ -347,7 +367,7 @@ async function sincronizarResultados() {
                     [
                         'marcador_final_registrado',
                         partidoId,
-                        `Se ha registrado el marcador final del partido #${partidoId}: ${partidoEncontrado.local} ${golesLocal} - ${golesVisitante} ${partidoEncontrado.visitante} (Auto-validado)`,
+                        `Se ha registrado el marcador final del partido #${partidoId}: ${partidoEncontrado.local} ${golesLocalFinal} - ${golesVisitanteFinal} ${partidoEncontrado.visitante} (Auto-validado)`,
                         true
                     ]
                 );
@@ -362,10 +382,10 @@ async function sincronizarResultados() {
 
                 for (const pro of pros.rows) {
                     let puntos=0, estado='Falló';
-                    if (pro.pro_local===golesLocal && pro.pro_visitante===golesVisitante) { puntos=5; estado='Exacto'; }
-                    else if ((pro.pro_local>pro.pro_visitante && golesLocal>golesVisitante) || 
-                             (pro.pro_local<pro.pro_visitante && golesLocal<golesVisitante) || 
-                             (pro.pro_local===pro.pro_visitante && golesLocal===golesVisitante)) { 
+                    if (pro.pro_local===golesLocalFinal && pro.pro_visitante===golesVisitanteFinal) { puntos=5; estado='Exacto'; }
+                    else if ((pro.pro_local>pro.pro_visitante && golesLocalFinal>golesVisitanteFinal) || 
+                             (pro.pro_local<pro.pro_visitante && golesLocalFinal<golesVisitanteFinal) || 
+                             (pro.pro_local===pro.pro_visitante && golesLocalFinal===golesVisitanteFinal)) { 
                         puntos=3; 
                         estado='Acierto'; 
                     }
@@ -374,8 +394,8 @@ async function sincronizarResultados() {
                         nombre: pro.nombre, 
                         local: partidoEncontrado.local, 
                         visitante: partidoEncontrado.visitante, 
-                        golesLocal, 
-                        golesVisitante, 
+                        golesLocal: golesLocalFinal, 
+                        golesVisitante: golesVisitanteFinal, 
                         proLocal: pro.pro_local, 
                         proVisitante: pro.pro_visitante, 
                         puntos, 
