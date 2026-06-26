@@ -426,6 +426,15 @@ function renderizarBracket() {
 function posicionarDinamico() {
     const outer = document.getElementById('bk3outer');
     if (!outer) return;
+
+    // Reset margins before measuring to avoid accumulation errors
+    const match101 = outer.querySelector('[data-id="101"]');
+    const match102 = outer.querySelector('[data-id="102"]');
+    const match104 = outer.querySelector('[data-id="104"]');
+    if (match101) match101.style.marginTop = '0px';
+    if (match102) match102.style.marginTop = '0px';
+    if (match104) match104.style.marginTop = '0px';
+
     const oRect = outer.getBoundingClientRect();
 
     function getMatchMid(id) {
@@ -441,7 +450,7 @@ function posicionarDinamico() {
         };
     }
 
-    // ── Centrar SF izquierda entre QF97 y QF98 ──
+    // ── Centrar SF izquierda/derecha entre sus Cuartos de final correspondientes ──
     function centrarMatch(matchId, refId1, refId2, slotSelector) {
         const r1 = getMatchMid(refId1), r2 = getMatchMid(refId2);
         const slot = outer.querySelector(slotSelector);
@@ -474,223 +483,6 @@ function posicionarDinamico() {
         // ── Dibujar líneas SVG ──
         drawConnectors();
     });
-}
-
-function drawConnectors() {
-    const svg   = document.getElementById('bk3svg');
-    const outer = document.getElementById('bk3outer');
-    if (!svg || !outer) return;
-
-    const oRect = outer.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${oRect.width} ${oRect.height}`);
-
-    const LC = 'rgba(255,255,255,0.18)';
-    const SW = 1;
-    let paths = '';
-
-    function getMatchMid(id) {
-        const el = outer.querySelector(`[data-id="${id}"] .bk3-box`);
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
-        return {
-            midY:  r.top  - oRect.top + r.height/2,
-            right: r.right - oRect.left,
-            left:  r.left  - oRect.left,
-        };
-    }
-
-    function hLine(x1,x2,y){ paths+=`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${LC}" stroke-width="${SW}"/>`; }
-    function vLine(x,y1,y2){ paths+=`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${LC}" stroke-width="${SW}"/>`; }
-
-    function connectLeft(id1, id2, idNext) {
-        const a1=getMatchMid(id1), a2=getMatchMid(id2), b=getMatchMid(idNext);
-        if (!a1||!a2||!b) return;
-        const midX = a1.right + (b.left - a1.right)*0.5;
-        hLine(a1.right, midX, a1.midY);
-        hLine(a2.right, midX, a2.midY);
-        vLine(midX, a1.midY, a2.midY);
-        hLine(midX, b.left, b.midY);
-    }
-
-    function connectRight(id1, id2, idNext) {
-        const a1=getMatchMid(id1), a2=getMatchMid(id2), b=getMatchMid(idNext);
-        if (!a1||!a2||!b) return;
-        const midX = b.right + (a1.left - b.right)*0.5;
-        hLine(a1.left, midX, a1.midY);
-        hLine(a2.left, midX, a2.midY);
-        vLine(midX, a1.midY, a2.midY);
-        hLine(b.right, midX, b.midY);
-    }
-
-    // Lado izquierdo
-    connectLeft(74, 77, 89);
-    connectLeft(73, 75, 90);
-    connectLeft(83, 84, 93);
-    connectLeft(81, 82, 94);
-    connectLeft(89, 90, 97);
-    connectLeft(93, 94, 98);
-    connectLeft(97, 98, 101);
-
-    // Lado derecho
-    connectRight(76, 78, 91);
-    connectRight(79, 80, 92);
-    connectRight(86, 88, 95);
-    connectRight(85, 87, 96);
-    connectRight(91, 92, 99);
-    connectRight(95, 96, 100);
-    connectRight(99, 100, 102);
-
-    // SF → Final
-    const sf1=getMatchMid(101), sf2=getMatchMid(102), fin=getMatchMid(104);
-    if (sf1&&fin) {
-        const midX = sf1.right + (fin.left - sf1.right)*0.5;
-        hLine(sf1.right, midX, sf1.midY);
-        vLine(midX, sf1.midY, fin.midY);
-        hLine(midX, fin.left, fin.midY);
-    }
-    if (sf2&&fin) {
-        const midX = fin.right + (sf2.left - fin.right)*0.5;
-        hLine(sf2.left, midX, sf2.midY);
-        vLine(midX, sf2.midY, fin.midY);
-        hLine(fin.right, midX, fin.midY);
-    }
-
-    svg.innerHTML = paths;
-}
-
-function posicionarDinamico() {
-    const outer = document.getElementById('bk3outer');
-    if (!outer) return;
-    const oRect = outer.getBoundingClientRect();
-
-    function getMatchMid(id) {
-        const el = outer.querySelector(`[data-id="${id}"] .bk3-box`);
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
-        return {
-            x: r.left - oRect.left, y: r.top - oRect.top,
-            w: r.width, h: r.height,
-            midY: r.top - oRect.top + r.height/2,
-            right: r.right - oRect.left,
-            left:  r.left  - oRect.left,
-        };
-    }
-
-    // ── Centrar SF izquierda entre QF97 y QF98 ──
-    function centrarMatch(matchId, refId1, refId2, slotSelector) {
-        const r1 = getMatchMid(refId1), r2 = getMatchMid(refId2);
-        const slot = outer.querySelector(slotSelector);
-        const matchEl = outer.querySelector(`[data-id="${matchId}"]`);
-        if (!r1 || !r2 || !slot || !matchEl) return;
-
-        const targetMidY  = (r1.midY + r2.midY) / 2;
-        const slotTop     = slot.getBoundingClientRect().top - oRect.top;
-        const matchH      = matchEl.getBoundingClientRect().height;
-        const marginTop   = Math.max(0, targetMidY - slotTop - matchH/2);
-        matchEl.style.marginTop = marginTop + 'px';
-    }
-
-    centrarMatch(101, 97, 98, `#bk3-sf-slot-101`);
-    centrarMatch(102, 99, 100, `#bk3-sf-slot-102`);
-
-    // ── Centrar Final entre SF101 y SF102 (después de centrar SF) ──
-    requestAnimationFrame(() => {
-        const sf1 = getMatchMid(101), sf2 = getMatchMid(102);
-        const finalEl = outer.querySelector('[data-id="104"]');
-        const finalSlot = outer.querySelector('#bk3-final-inner');
-        if (!sf1 || !sf2 || !finalEl || !finalSlot) return;
-
-        const targetMidY = (sf1.midY + sf2.midY) / 2;
-        const slotTop    = finalSlot.getBoundingClientRect().top - oRect.top;
-        const finalH     = finalEl.getBoundingClientRect().height;
-        const marginTop  = Math.max(0, targetMidY - slotTop - finalH/2 - 30); // -30 por el trofeo
-        finalEl.style.marginTop = marginTop + 'px';
-
-        // ── Dibujar líneas SVG ──
-        drawConnectors();
-    });
-}
-
-function drawConnectors() {
-    const svg   = document.getElementById('bk3svg');
-    const outer = document.getElementById('bk3outer');
-    if (!svg || !outer) return;
-
-    const oRect = outer.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${oRect.width} ${oRect.height}`);
-
-    const LC = 'rgba(255,255,255,0.18)';
-    const SW = 1;
-    let paths = '';
-
-    function getMatchMid(id) {
-        const el = outer.querySelector(`[data-id="${id}"] .bk3-box`);
-        if (!el) return null;
-        const r = el.getBoundingClientRect();
-        return {
-            midY:  r.top  - oRect.top + r.height/2,
-            right: r.right - oRect.left,
-            left:  r.left  - oRect.left,
-        };
-    }
-
-    function hLine(x1,x2,y){ paths+=`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${LC}" stroke-width="${SW}"/>`; }
-    function vLine(x,y1,y2){ paths+=`<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${LC}" stroke-width="${SW}"/>`; }
-
-    function connectLeft(id1, id2, idNext) {
-        const a1=getMatchMid(id1), a2=getMatchMid(id2), b=getMatchMid(idNext);
-        if (!a1||!a2||!b) return;
-        const midX = a1.right + (b.left - a1.right)*0.5;
-        hLine(a1.right, midX, a1.midY);
-        hLine(a2.right, midX, a2.midY);
-        vLine(midX, a1.midY, a2.midY);
-        hLine(midX, b.left, b.midY);
-    }
-
-    function connectRight(id1, id2, idNext) {
-        const a1=getMatchMid(id1), a2=getMatchMid(id2), b=getMatchMid(idNext);
-        if (!a1||!a2||!b) return;
-        const midX = b.right + (a1.left - b.right)*0.5;
-        hLine(a1.left, midX, a1.midY);
-        hLine(a2.left, midX, a2.midY);
-        vLine(midX, a1.midY, a2.midY);
-        hLine(b.right, midX, b.midY);
-    }
-
-    // Lado izquierdo
-    connectLeft(74, 77, 89);
-    connectLeft(73, 75, 90);
-    connectLeft(83, 84, 93);
-    connectLeft(81, 82, 94);
-    connectLeft(89, 90, 97);
-    connectLeft(93, 94, 98);
-    connectLeft(97, 98, 101);
-
-    // Lado derecho
-    connectRight(76, 78, 91);
-    connectRight(79, 80, 92);
-    connectRight(86, 88, 95);
-    connectRight(85, 87, 96);
-    connectRight(91, 92, 99);
-    connectRight(95, 96, 100);
-    connectRight(99, 100, 102);
-
-    // SF → Final
-    const sf1=getMatchMid(101), sf2=getMatchMid(102), fin=getMatchMid(104);
-    if (sf1&&fin) {
-        const midX = sf1.right + (fin.left - sf1.right)*0.5;
-        hLine(sf1.right, midX, sf1.midY);
-        vLine(midX, sf1.midY, fin.midY);
-        hLine(midX, fin.left, fin.midY);
-    }
-    if (sf2&&fin) {
-        const midX = fin.right + (sf2.left - fin.right)*0.5;
-        hLine(sf2.left, midX, sf2.midY);
-        vLine(midX, sf2.midY, fin.midY);
-        hLine(fin.right, midX, fin.midY);
-    }
-
-    svg.innerHTML = paths;
 }
 
 function drawConnectors() {
@@ -710,10 +502,6 @@ function drawConnectors() {
         if (!el) return null;
         const r = el.getBoundingClientRect();
         return {
-            x: r.left - oRect.left,
-            y: r.top  - oRect.top,
-            w: r.width,
-            h: r.height,
             midY: r.top - oRect.top + r.height / 2,
             right: r.right - oRect.left,
             left:  r.left  - oRect.left,
@@ -728,7 +516,6 @@ function drawConnectors() {
     }
 
     // Conectar pares de matches de ronda A → ronda B (lado izquierdo)
-    // Línea: desde right de A1, horizontal hasta mitad del gap, vertical al midY de A2, horizontal hasta left de B
     function connectPairLeft(idA1, idA2, idB) {
         const a1 = getMatchMid(idA1), a2 = getMatchMid(idA2), b = getMatchMid(idB);
         if (!a1||!a2||!b) return;
@@ -739,7 +526,7 @@ function drawConnectors() {
         hLine(midX, b.left, b.midY);
     }
 
-    // Lado derecho: desde left de A hacia B
+    // Lado derecho
     function connectPairRight(idA1, idA2, idB) {
         const a1 = getMatchMid(idA1), a2 = getMatchMid(idA2), b = getMatchMid(idB);
         if (!a1||!a2||!b) return;
@@ -751,27 +538,21 @@ function drawConnectors() {
     }
 
     // ── Lado izquierdo ──
-    // R32 → R16
     connectPairLeft(74, 77, 89);
     connectPairLeft(73, 75, 90);
     connectPairLeft(83, 84, 93);
     connectPairLeft(81, 82, 94);
-    // R16 → QF
     connectPairLeft(89, 90, 97);
     connectPairLeft(93, 94, 98);
-    // QF → SF
     connectPairLeft(97, 98, 101);
 
     // ── Lado derecho ──
-    // R32 → R16
     connectPairRight(76, 78, 91);
     connectPairRight(79, 80, 92);
     connectPairRight(86, 88, 95);
     connectPairRight(85, 87, 96);
-    // R16 → QF
     connectPairRight(91, 92, 99);
     connectPairRight(95, 96, 100);
-    // QF → SF
     connectPairRight(99, 100, 102);
 
     // ── SF → Final ──
@@ -791,6 +572,14 @@ function drawConnectors() {
 
     svg.innerHTML = paths;
 }
+
+// ── Evento Resize Responsivo ──
+window.addEventListener('resize', () => {
+    const vistaBracket = document.getElementById('vistaBracket');
+    if (vistaBracket && vistaBracket.style.display === 'block') {
+        posicionarDinamico();
+    }
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function obtenerEmoji(cod) {
