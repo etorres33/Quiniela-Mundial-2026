@@ -38,17 +38,31 @@ async function cargarDatos() {
         }
 
         construirTabsGrupos();
-        renderizarGrupo('A');
+
+        const vistaBracketVisible = document.getElementById('vistaBracket').style.display === 'block';
+        if (vistaBracketVisible) {
+            renderizarBracket();
+        } else {
+            renderizarGrupo(grupoActivoRes);
+        }
     } catch (err) {
         console.error(err);
-        document.getElementById('contenidoGrupo').innerHTML =
+        const vistaBracketVisible = document.getElementById('vistaBracket').style.display === 'block';
+        const targetId = vistaBracketVisible ? 'contenidoBracket' : 'contenidoGrupo';
+        document.getElementById(targetId).innerHTML =
             '<p style="text-align:center;color:#e74c3c;padding:2rem;">⚠️ Error al cargar datos.</p>';
     }
 }
 
 async function recargarDatos() {
-    document.getElementById('contenidoGrupo').innerHTML =
-        '<div class="res-loading"><i class="fa-solid fa-spinner fa-spin"></i> Actualizando...</div>';
+    const vistaBracketVisible = document.getElementById('vistaBracket').style.display === 'block';
+    if (vistaBracketVisible) {
+        document.getElementById('contenidoBracket').innerHTML =
+            '<div class="res-loading"><i class="fa-solid fa-spinner fa-spin"></i> Actualizando bracket...</div>';
+    } else {
+        document.getElementById('contenidoGrupo').innerHTML =
+            '<div class="res-loading"><i class="fa-solid fa-spinner fa-spin"></i> Actualizando...</div>';
+    }
     await cargarDatos();
 }
 
@@ -57,7 +71,7 @@ function construirTabsGrupos() {
     const container = document.getElementById('gruposTabs');
     const grupos = Object.keys(tablaGlobal).sort();
     container.innerHTML = grupos.map(g => `
-        <button class="grupo-tab ${g === 'A' ? 'activo' : ''}"
+        <button class="grupo-tab ${g === grupoActivoRes ? 'activo' : ''}"
             onclick="seleccionarGrupoRes('${g}', this)">
             Grupo ${g}
         </button>`).join('');
