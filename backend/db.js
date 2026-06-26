@@ -83,6 +83,49 @@ async function query(text, params) {
             ON CONFLICT (clave) DO NOTHING;
         `);
         console.log('✅ Valores iniciales de config_bolsa verificados/insertados.');
+
+        // Crear tabla config_quiniela si no existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS config_quiniela (
+                clave  VARCHAR(50) PRIMARY KEY,
+                valor  VARCHAR(255) NOT NULL
+            );
+        `);
+        console.log('✅ Tabla config_quiniela verificada/creada.');
+
+        // Insertar valores predeterminados en config_quiniela
+        await pool.query(`
+            INSERT INTO config_quiniela (clave, valor) VALUES
+                ('MundialFinalizado',   '0'),
+                ('GanadoresRevelados',  '0')
+            ON CONFLICT (clave) DO NOTHING;
+        `);
+        console.log('✅ Valores iniciales de config_quiniela verificados/insertados.');
+
+        // Crear tabla ganadores_finales si no existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ganadores_finales (
+                id_ganador        SERIAL PRIMARY KEY,
+                id_usuario        INT NOT NULL REFERENCES usuarios(id_usuario),
+                posicion          INT NOT NULL,
+                puntos            INT NOT NULL,
+                porcentaje_premio DECIMAL(5,2) NOT NULL,
+                monto_premio      DECIMAL(10,2) NOT NULL,
+                fecha_revelo      TIMESTAMP DEFAULT NOW()
+            );
+        `);
+        console.log('✅ Tabla ganadores_finales verificada/creada.');
+
+        // Crear tabla partidos_revelados si no existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS partidos_revelados (
+                partido_id     INT PRIMARY KEY,
+                revelado       BOOLEAN DEFAULT FALSE,
+                fecha_revelado TIMESTAMP DEFAULT NOW(),
+                revelado_por   VARCHAR(100)
+            );
+        `);
+        console.log('✅ Tabla partidos_revelados verificada/creada.');
     } catch (err) {
         console.error('❌ Error al verificar/crear tabla/columna:', err);
     }

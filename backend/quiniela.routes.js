@@ -1240,4 +1240,341 @@ router.get('/debug-email-logs', async (req, res) => {
     }
 });
 
+// ─── QUERY WRAPPER FOR PG COMPATIBILITY ──────────────────────────────────────
+async function queryPG(text, params = []) {
+    const res = await query(text, params);
+    return res.rows;
+}
+
+// ─── HELPER CONFIG BOLSA ─────────────────────────────────────────────────────
+async function getConfigBolsa() {
+    const rows = await queryPG(`SELECT clave, valor FROM config_bolsa`);
+    const cfg  = {};
+    rows.forEach(r => { cfg[r.clave] = parseFloat(r.valor); });
+    return {
+        pctAdmin:   cfg.PctAdmin   ?? 15,
+        pctPremio1: cfg.PctPremio1 ?? 50,
+        pctPremio2: cfg.PctPremio2 ?? 30,
+        pctPremio3: cfg.PctPremio3 ?? 20,
+    };
+}
+
+// ─── ADMIN: BOLSA ────────────────────────────────────────────────────────────
+router.get('/admin/bolsa', async (req, res) => {
+    try {
+        const [insRows, cfg] = await Promise.all([
+            queryPG(`SELECT COALESCE(SUM(b.monto),0) AS total_recaudado,
+                          COUNT(DISTINCT s.id_usuario) AS total_participantes
+                   FROM suscripciones s INNER JOIN bolsa b ON b.id_usuario=s.id_usuario
+                   WHERE s.activa=true`),
+            getConfigBolsa()
+        ]);
+
+        const totalRecaudado     = parseFloat(insRows[0].total_recaudado) || 0;
+        const totalParticipantes = parseInt(insRows[0].total_participantes) || 0;
+        const bolsaPremios       = totalRecaudado * ((100 - cfg.pctAdmin) / 100);
+        const cuotaAdmin         = totalRecaudado * (cfg.pctAdmin / 100);
+        const premio1            = bolsaPremios * (cfg.pctPremio1 / 100);
+        const premio2            = bolsaPremios * (cfg.pctPremio2 / 100);
+        const premio3            = bolsaPremios * (cfg.pctPremio3 / 100);
+
+        const ranking = await queryPG(
+            `SELECT id_usuario AS "IdUsuario", nombre AS "Nombre",
+                    COALESCE(puntos_totales,0) AS "Puntos",
+                    DENSE_RANK() OVER (ORDER BY COALESCE(puntos_totales,0) DESC) AS "Posicion"
+             FROM usuarios u LEFT JOIN puntajes p USING(id_usuario)
+             WHERE u.activo=true
+             ORDER BY "Puntos" DESC LIMIT 5`
+        );
+
+        const pos1 = ranking.filter(u => u.Posicion === 1);
+        const pos2 = ranking.filter(u => u.Posicion === 2);
+        const pos3 = ranking.filter(u => u.Posicion === 3);
+
+        const combinar = (arr, premios) => {
+            const t = premios.reduce((a, b) => a + b, 0);
+            return arr.map(u => ({ ...u, montoPremio: t/arr.length, porcentaje: ((t/bolsaPremios)*100/arr.length).toFixed(2) }));
+        };
+
+        let distribucion = [];
+        if      (pos1.length > 1) distribucion = [...combinar(pos1,[premio1,premio2]),...combinar(pos2.length?pos2:pos3,[premio3])];
+        else if (pos2.length > 1) distribucion = [...combinar(pos1,[premio1]),...combinar(pos2,[premio2,premio3])];
+        else if (pos3.length > 1) distribucion = [...combinar(pos1,[premio1]),...combinar(pos2,[premio2]),...combinar(pos3,[premio3])];
+        else                      distribucion = [
+            ...(pos1[0]?[{...pos1[0],montoPremio:premio1,porcentaje:cfg.pctPremio1.toFixed(2)}]:[]),
+            ...(pos2[0]?[{...pos2[0],montoPremio:premio2,porcentaje:cfg.pctPremio2.toFixed(2)}]:[]),
+            ...(pos3[0]?[{...pos3[0],montoPremio:premio3,porcentaje:cfg.pctPremio3.toFixed(2)}]:[]),
+        ];
+
+        return res.json({ ok:true, totalRecaudado, totalParticipantes, bolsaPremios, cuotaAdmin, premio1, premio2, premio3, distribucion, ranking, config:cfg });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error.' });
+    }
+});
+
+// ─── ADMIN: GUARDAR CONFIG BOLSA ─────────────────────────────────────────────
+router.post('/admin/config-bolsa', async (req, res) => {
+    try {
+        const { pctAdmin, pctPremio1, pctPremio2, pctPremio3 } = req.body;
+        const vals = [pctAdmin, pctPremio1, pctPremio2, pctPremio3];
+        if (vals.some(v => v === undefined || v === null || isNaN(v)))
+            return res.status(400).json({ ok: false, message: 'Todos los porcentajes son requeridos.' });
+        if (vals.some(v => v < 0 || v > 100))
+            return res.status(400).json({ ok: false, message: 'Los porcentajes deben estar entre 0 y 100.' });
+        if (pctAdmin > 50)
+            return res.status(400).json({ ok: false, message: '⛔ La cuota admin no puede superar el 50%.' });
+        const suma = parseFloat(pctPremio1)+parseFloat(pctPremio2)+parseFloat(pctPremio3);
+        if (Math.abs(suma - 100) > 0.01)
+            return res.status(400).json({ ok: false, message: `⛔ Los premios deben sumar 100% (actualmente ${suma.toFixed(2)}%).` });
+
+        const updates = [['PctAdmin',pctAdmin],['PctPremio1',pctPremio1],['PctPremio2',pctPremio2],['PctPremio3',pctPremio3]];
+        for (const [clave, valor] of updates) {
+            await queryPG(
+                `INSERT INTO config_bolsa (clave, valor) VALUES ($1,$2)
+                 ON CONFLICT (clave) DO UPDATE SET valor=$2, fecha_actualizacion=NOW()`,
+                [clave, parseFloat(valor)]
+            );
+        }
+
+        return res.json({ ok: true, message: '✅ Porcentajes actualizados correctamente.' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al guardar configuración.' });
+    }
+});
+
+// ─── PÚBLICO: BOLSA PARA USUARIOS ────────────────────────────────────────────
+router.get('/bolsa-premios', async (req, res) => {
+    try {
+        const [insRows, cfg] = await Promise.all([
+            queryPG(`SELECT COALESCE(SUM(b.monto),0) AS total_recaudado,
+                          COUNT(DISTINCT s.id_usuario) AS total_participantes
+                   FROM suscripciones s INNER JOIN bolsa b ON b.id_usuario=s.id_usuario
+                   WHERE s.activa=true`),
+            getConfigBolsa()
+        ]);
+
+        const totalRecaudado     = parseFloat(insRows[0].total_recaudado) || 0;
+        const totalParticipantes = parseInt(insRows[0].total_participantes) || 0;
+        const bolsaPremios       = totalRecaudado * ((100 - cfg.pctAdmin) / 100);
+        const premio1            = bolsaPremios * (cfg.pctPremio1 / 100);
+        const premio2            = bolsaPremios * (cfg.pctPremio2 / 100);
+        const premio3            = bolsaPremios * (cfg.pctPremio3 / 100);
+
+        const ranking = await queryPG(
+            `SELECT u.nombre AS "Nombre", u.foto_url AS "FotoUrl",
+                    COALESCE(p.puntos_totales,0) AS "Puntos",
+                    DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC) AS "Posicion"
+             FROM usuarios u LEFT JOIN puntajes p ON u.id_usuario=p.id_usuario
+             WHERE u.activo=true AND u.id_usuario <> 1
+             ORDER BY "Puntos" DESC LIMIT 3`
+        );
+
+        return res.json({ ok:true, totalRecaudado, totalParticipantes, bolsaPremios, premio1, premio2, premio3,
+            pctPremio1:cfg.pctPremio1, pctPremio2:cfg.pctPremio2, pctPremio3:cfg.pctPremio3, ranking });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error.' });
+    }
+});
+
+// ─── ESTADO QUINIELA ──────────────────────────────────────────────────────────
+router.get('/estado-quiniela', async (req, res) => {
+    try {
+        const rows = await queryPG(`SELECT clave, valor FROM config_quiniela`);
+        const estado = {};
+        rows.forEach(r => { estado[r.clave] = r.valor; });
+
+        let ganadores = [];
+        if (estado.GanadoresRevelados === '1') {
+            ganadores = await queryPG(
+                `SELECT g.posicion AS "Posicion", g.puntos AS "Puntos", g.monto_premio AS "MontoPremio",
+                        g.porcentaje_premio AS "PorcentajePremio", u.nombre AS "Nombre", u.foto_url AS "FotoUrl"
+                 FROM ganadores_finales g INNER JOIN usuarios u ON g.id_usuario=u.id_usuario
+                 ORDER BY g.posicion ASC, g.monto_premio DESC`
+            );
+        }
+        return res.json({ ok: true, ...estado, ganadores });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: 'Error.' });
+    }
+});
+
+// ─── ADMIN: REVELAR GANADORES ─────────────────────────────────────────────────
+router.post('/admin/revelar-ganadores', async (req, res) => {
+    try {
+        const config = await queryPG(`SELECT valor FROM config_quiniela WHERE clave='GanadoresRevelados'`);
+        if (config[0]?.valor === '1') return res.status(409).json({ ok: false, message: '⚠️ Ganadores ya revelados.' });
+
+        const bolsaR = await queryPG(`SELECT COALESCE(SUM(monto),0) AS total FROM bolsa`);
+        const cfg    = await getConfigBolsa();
+        const totalRecaudado = parseFloat(bolsaR[0].total) || 0;
+        const bolsaPremios   = totalRecaudado * ((100 - cfg.pctAdmin) / 100);
+        const premio1=bolsaPremios*(cfg.pctPremio1/100), premio2=bolsaPremios*(cfg.pctPremio2/100), premio3=bolsaPremios*(cfg.pctPremio3/100);
+
+        const ranking = await queryPG(
+            `SELECT u.id_usuario, u.nombre, COALESCE(p.puntos_totales,0) AS puntos,
+                    DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC) AS posicion
+             FROM usuarios u LEFT JOIN puntajes p ON u.id_usuario=p.id_usuario
+             WHERE u.activo=true AND u.id_usuario<>1`
+        );
+
+        const groups={};
+        ranking.forEach(u=>{ if(!groups[u.puntos]) groups[u.puntos]=[]; groups[u.puntos].push(u); });
+        const sortedPoints=Object.keys(groups).map(Number).sort((a,b)=>b-a);
+        const prizes=[premio1,premio2,premio3];
+        let distribucion=[], prizeIdx=0;
+        for (const pts of sortedPoints) {
+            if (prizeIdx>=prizes.length) break;
+            const gUsers=groups[pts], L=gUsers.length;
+            const gPrizes=prizes.slice(prizeIdx,prizeIdx+L);
+            prizeIdx+=L;
+            if (!gPrizes.length) break;
+            const sumP=gPrizes.reduce((a,b)=>a+b,0);
+            gUsers.forEach(u=>distribucion.push({...u,montoPremio:sumP/L,porcentaje:((sumP/bolsaPremios)*100/L).toFixed(2)}));
+        }
+
+        for (const g of distribucion) {
+            await queryPG(
+                `INSERT INTO ganadores_finales (id_usuario,posicion,puntos,porcentaje_premio,monto_premio)
+                 VALUES ($1,$2,$3,$4,$5)`,
+                [g.id_usuario, g.posicion, g.puntos, parseFloat(g.porcentaje), g.montoPremio]
+            );
+        }
+
+        await queryPG(`UPDATE config_quiniela SET valor='1' WHERE clave='GanadoresRevelados'`);
+
+        const todos = await queryPG(
+            `SELECT u.id_usuario, u.nombre, u.correo, COALESCE(p.puntos_totales,0) AS puntos,
+                    DENSE_RANK() OVER (ORDER BY COALESCE(p.puntos_totales,0) DESC) AS posicion
+             FROM usuarios u LEFT JOIN puntajes p ON u.id_usuario=p.id_usuario
+             WHERE u.activo=true AND u.correo IS NOT NULL AND u.correo!=''`
+        );
+
+        const fmt=n=>`$${Number(n).toLocaleString('es-MX',{minimumFractionDigits:2})} MXN`;
+        const medallas={1:'🥇',2:'🥈',3:'🥉'};
+        const tablaHTML=distribucion.map(g=>`<tr><td>${medallas[g.posicion]}</td><td>${g.nombre}</td><td>${g.puntos} pts</td><td>${fmt(g.montoPremio)}</td></tr>`).join('');
+
+        for (const u of todos) {
+            const gi=distribucion.find(g=>g.id_usuario===u.id_usuario);
+            const html=`<div style="font-family:sans-serif;max-width:600px;background:#05101a;color:white;border-radius:16px;overflow:hidden;"><div style="background:linear-gradient(135deg,#f1c40f,#d4ac0d);padding:2rem;text-align:center;"><h1 style="color:#000;">🏆 ¡El Mundial ha terminado!</h1></div>${gi?`<div style="padding:1.5rem;text-align:center;"><p style="font-size:3rem;">${medallas[gi.posicion]}</p><h2 style="color:#2ecc71;">¡Felicidades ${u.nombre}!</h2><p>Premio: <strong style="color:#f1c40f;">${fmt(gi.montoPremio)}</strong></p></div>`:`<div style="padding:1.5rem;text-align:center;"><p>Hola ${u.nombre}, terminaste en ${u.posicion}° con ${u.puntos} pts.</p></div>`}<div style="padding:1rem;"><table style="width:100%;"><thead><tr><th>Pos</th><th>Nombre</th><th>Puntos</th><th>Premio</th></tr></thead><tbody>${tablaHTML}</tbody></table></div><div style="padding:1rem;text-align:center;"><small>Quiniela Mundial 2026 — torreslab</small></div></div>`;
+            enviarCorreoResultado({ correo:u.correo, nombre:u.nombre, asunto:'🏆 Resultados Quiniela Mundial 2026', htmlPersonalizado:html }).catch(console.error);
+        }
+
+        return res.json({ ok:true, message:'🏆 Ganadores revelados y correos enviados.', distribucion });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error.' });
+    }
+});
+
+// ─── PRONÓSTICOS PÚBLICOS POR PARTIDO ────────────────────────────────────────
+router.get('/pronosticos-partido/:partidoId', validarTokenUsuario, async (req, res) => {
+    try {
+        const partidoId = parseInt(req.params.partidoId);
+
+        const revelado = await queryPG(
+            `SELECT revelado FROM partidos_revelados WHERE partido_id=$1`,
+            [partidoId]
+        );
+        const estaRevelado = revelado[0]?.revelado === true;
+
+        const tokenAdmin    = req.headers['x-admin-token'] || req.query.adminToken;
+        const secret        = process.env.ADMIN_SECRET || 'default-admin-secret-2026-torreslab';
+        const expectedAdmin = crypto.createHmac('sha256', secret).update('1').digest('hex');
+        const esAdmin       = tokenAdmin === expectedAdmin;
+
+        if (!estaRevelado && !esAdmin) {
+            return res.json({ ok: true, revelado: false, pronosticos: [] });
+        }
+
+        const rows = await queryPG(
+            `SELECT u.nombre AS "Nombre", p.goles_local AS "GolesLocal", p.goles_visitante AS "GolesVisitante",
+                    p.fecha_registro AS "FechaRegistro", p.hash_integridad AS "HashIntegridad",
+                    CASE WHEN p.modificado_por IS NOT NULL THEN 1 ELSE 0 END AS "Sospechoso",
+                    p.modificado_por AS "ModificadoPor"
+             FROM pronosticos p
+             INNER JOIN usuarios u ON u.id_usuario=p.id_usuario
+             WHERE p.partido_id=$1
+             ORDER BY u.nombre ASC`,
+            [partidoId]
+        );
+
+        return res.json({ ok: true, revelado: true, pronosticos: rows });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al obtener pronósticos.' });
+    }
+});
+
+// ─── ADMIN: REVELAR PRONÓSTICOS DE UN PARTIDO ────────────────────────────────
+router.post('/admin/revelar-partido', validarTokenAdmin, async (req, res) => {
+    try {
+        const { partidoId } = req.body;
+        if (!partidoId) return res.status(400).json({ ok: false, message: 'Falta partidoId.' });
+
+        await queryPG(
+            `INSERT INTO partidos_revelados (partido_id, revelado, fecha_revelado, revelado_por)
+             VALUES ($1, true, NOW(), 'admin')
+             ON CONFLICT (partido_id)
+             DO UPDATE SET revelado=true, fecha_revelado=NOW(), revelado_por='admin'`,
+            [partidoId]
+        );
+
+        await registrarLogActividad({ idUsuario: 1, accion:'revelar_partido', partidoId, detalle:`Partido ${partidoId} revelado`, exito:true });
+        return res.json({ ok: true, message: `✅ Pronósticos del partido ${partidoId} revelados.` });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al revelar.' });
+    }
+});
+
+// ─── STANDINGS REALES ─────────────────────────────────────────────────────────
+router.get('/standings-reales', async (req, res) => {
+    try {
+        const result = await queryPG(`SELECT partido_id AS "PartidoId", goles_local AS "GolesLocal", goles_visitante AS "GolesVisitante" FROM resultados_reales`);
+        const resultados = result;
+
+        const grupos = {};
+        partidos.forEach(p => {
+            if (!p.grupo) return;
+            if (!grupos[p.grupo]) grupos[p.grupo] = {};
+            [{ nombre:p.local, cod:p.codLocal }, { nombre:p.visitante, cod:p.codVisitante }].forEach(({ nombre, cod }) => {
+                if (!grupos[p.grupo][nombre])
+                    grupos[p.grupo][nombre] = { nombre, cod, j:0, g:0, e:0, l:0, gf:0, gc:0, pts:0 };
+            });
+        });
+
+        partidos.forEach(p => {
+            if (!p.grupo) return;
+            const res = resultados.find(r => r.PartidoId === p.id);
+            if (!res) return;
+            const eqL = grupos[p.grupo][p.local], eqV = grupos[p.grupo][p.visitante];
+            if (!eqL || !eqV) return;
+            const gl = res.GolesLocal, gv = res.GolesVisitante;
+            eqL.j++; eqV.j++; eqL.gf+=gl; eqL.gc+=gv; eqV.gf+=gv; eqV.gc+=gl;
+            if (gl>gv) { eqL.g++; eqL.pts+=3; eqV.l++; }
+            else if (gl<gv) { eqV.g++; eqV.pts+=3; eqL.l++; }
+            else { eqL.e++; eqL.pts++; eqV.e++; eqV.pts++; }
+        });
+
+        const tablas = {};
+        Object.keys(grupos).sort().forEach(g => {
+            tablas[g] = Object.values(grupos[g]).sort((a,b) => {
+                if (b.pts!==a.pts) return b.pts-a.pts;
+                const dA=a.gf-a.gc, dB=b.gf-b.gc;
+                if (dB!==dA) return dB-dA;
+                if (b.gf!==a.gf) return b.gf-a.gf;
+                return a.nombre.localeCompare(b.nombre);
+            });
+        });
+
+        return res.json({ ok: true, tablas });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al calcular standings.' });
+    }
+});
+
 module.exports = router;
