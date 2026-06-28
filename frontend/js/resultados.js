@@ -292,7 +292,14 @@ function renderizarBracket() {
             lC=res.GolesLocal>res.GolesVisitante?'winner':res.GolesLocal<res.GolesVisitante?'loser':'';
             vC=res.GolesVisitante>res.GolesLocal?'winner':res.GolesVisitante<res.GolesLocal?'loser':'';
         }
-        const bC=isFinal?'final-match':isBronze?'bronze-match':res?'has-result':'';
+        let bC = '';
+        if (isFinal) bC += ' final-match';
+        if (isBronze) bC += ' bronze-match';
+        if (res) {
+            bC += ' juego-finalizado';
+        } else if (p.fecha && p.fecha.trim().toLowerCase() === getFechaHoy().trim().toLowerCase()) {
+            bC += ' juego-hoy';
+        }
         return `<div class="bk3-match" data-id="${p.id}">
             <div class="bk3-num">P${p.id}</div>
             <div class="bk3-inner">
@@ -392,6 +399,8 @@ function renderizarBracket() {
     .bk3-box.has-result{border-color:rgba(255,255,255,.25);}
     .bk3-box.final-match{border:1.5px solid #B8860B;box-shadow:0 0 18px rgba(184,134,11,.25);}
     .bk3-box.bronze-match{border:1.5px solid #8B5E3C;}
+    .bk3-box.juego-hoy{border:1.5px solid #f1c40f !important;box-shadow:0 0 10px rgba(241,196,15,0.25);}
+    .bk3-box.juego-finalizado{border:1.5px solid #2ecc71 !important;box-shadow:0 0 10px rgba(46,204,113,0.15);}
     .bk3-team{display:flex;justify-content:space-between;align-items:center;padding:4px 7px;font-size:11px;min-height:25px;color:#cdd6e0;border-bottom:1px solid rgba(255,255,255,.05);gap:3px;font-family:"Twemoji Mozilla","Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;}
     .bk3-team:last-child{border-bottom:none;}
     .bk3-team.winner{background:rgba(22,136,63,.15);color:#2ecc71;font-weight:600;}
@@ -408,7 +417,9 @@ function renderizarBracket() {
     </style>
 
     <div class="bk3-leyenda">
-        <div class="bk3-ley"><div class="bk3-ley-box" style="background:rgba(22,136,63,.25);border:1px solid #16883f;"></div>Ganador</div>
+        <div class="bk3-ley"><div class="bk3-ley-box" style="border:1.5px solid #f1c40f;"></div>Partido de hoy</div>
+        <div class="bk3-ley"><div class="bk3-ley-box" style="border:1.5px solid #2ecc71;"></div>Finalizado</div>
+        <div class="bk3-ley"><div class="bk3-ley-box" style="background:rgba(22,136,63,.25);border:1px solid #16883f;"></div>Ganador caja</div>
         <div class="bk3-ley"><div class="bk3-ley-box" style="border:1.5px solid #B8860B;"></div>Final</div>
         <div class="bk3-ley"><div class="bk3-ley-box" style="border:1px solid rgba(255,255,255,.2);opacity:.5;"></div>Por definir</div>
     </div>
@@ -582,6 +593,15 @@ window.addEventListener('resize', () => {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function getFechaHoy() {
+    const now = new Date();
+    const day = now.getDate();
+    const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const month = meses[now.getMonth()];
+    const year = now.getFullYear();
+    return `${day} ${month} ${year}`;
+}
+
 function obtenerEmoji(cod) {
     if (!cod) return '';
     const c = cod.toUpperCase().trim();
