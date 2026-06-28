@@ -52,19 +52,37 @@ document.addEventListener("DOMContentLoaded", () => {
 async function inicializarAdmin() {
     const selectGrupo = document.querySelector("#selectGrupoAdmin");
     try {
-        const [resPartidos, resDB] = await Promise.all([
+        const [resPartidos, resElim, resDB] = await Promise.all([
             fetch("./data/partidos.json"),
+            fetch("./data/eliminatorios.json"),
             adminFetch(`${API_URL}/api/obtener-resultados`)
         ]);
-        partidosAdminGlobal   = await resPartidos.json();
-        poblarDropdownCampeonAdmin(partidosAdminGlobal);
+        const partidosData    = await resPartidos.json();
+        const elimData        = await resElim.json();
+
+        // Combinamos fase de grupos y eliminatorias
+        partidosAdminGlobal   = partidosData.concat(elimData);
+        
+        // Poblamos el dropdown de campeón usando solo los 48 equipos de fase de grupos
+        poblarDropdownCampeonAdmin(partidosData);
+
         const datosDB         = await resDB.json();
         if (datosDB.ok) resultadosGuardadosBD = datosDB.resultados;
+
         renderizarPartidosAdmin(partidosAdminGlobal);
+
         if (selectGrupo) {
             selectGrupo.addEventListener("change", (e) => {
                 const g = e.target.value;
-                renderizarPartidosAdmin(g === "TODOS" ? partidosAdminGlobal : partidosAdminGlobal.filter(p => p.grupo === g));
+                if (g === "TODOS") {
+                    renderizarPartidosAdmin(partidosAdminGlobal);
+                } else if (["16avos", "8vos", "Cuartos", "Semis"].includes(g)) {
+                    renderizarPartidosAdmin(partidosAdminGlobal.filter(p => p.fase === g));
+                } else if (g === "FINALES") {
+                    renderizarPartidosAdmin(partidosAdminGlobal.filter(p => p.fase === "Final" || p.fase === "3er Lugar"));
+                } else {
+                    renderizarPartidosAdmin(partidosAdminGlobal.filter(p => p.grupo === g));
+                }
             });
         }
     } catch (error) { console.error(error); }
