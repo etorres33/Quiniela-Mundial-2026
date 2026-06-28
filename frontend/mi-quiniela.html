@@ -39,10 +39,10 @@
 
             <!-- ─── TABS VISTA PRINCIPAL ────────────────────────── -->
             <div class="vista-tabs" style="margin-bottom:1rem;">
-                <button class="vista-tab vista-tab--activo" id="tabVistaGrupos" onclick="cambiarVistaMain('grupos')">
+                <button class="vista-tab" id="tabVistaGrupos" onclick="cambiarVistaMain('grupos')">
                     ⚽ Fase de Grupos
                 </button>
-                <button class="vista-tab" id="tabVistaEliminatorios" onclick="cambiarVistaMain('eliminatorios')">
+                <button class="vista-tab vista-tab--activo" id="tabVistaEliminatorios" onclick="cambiarVistaMain('eliminatorios')">
                     🏆 Eliminatorias
                 </button>
             </div>
@@ -50,7 +50,7 @@
             <!-- ═══════════════════════════════════════════════════ -->
             <!-- VISTA: FASE DE GRUPOS                               -->
             <!-- ═══════════════════════════════════════════════════ -->
-            <div id="vistaGrupos">
+            <div id="vistaGrupos" style="display:none;">
 
                 <!-- Tabs de grupos A-L -->
                 <div class="tabs-grupos-wrapper" id="tabsGruposQuiniela"></div>
@@ -114,7 +114,7 @@
             <!-- ═══════════════════════════════════════════════════ -->
             <!-- VISTA: ELIMINATORIOS                                -->
             <!-- ═══════════════════════════════════════════════════ -->
-            <div id="vistaEliminatorios" style="display:none;">
+            <div id="vistaEliminatorios">
                 <div style="background:rgba(241,196,15,.08); border:1px solid rgba(241,196,15,.2); border-radius:12px; padding:1rem 1.5rem; margin-bottom:1.5rem; display:flex; align-items:center; gap:.8rem;">
                     <span style="font-size:1.5rem;">ℹ️</span>
                     <p id="avisoEliminatorias" style="margin:0; color:#b8c2d6; font-size:.9rem;">
@@ -187,8 +187,12 @@
                 eliminatoriosCargados = true;
                 inicializarFases();
             }
-
         }
+
+        // Cargar eliminatorias por defecto al iniciar
+        window.addEventListener('DOMContentLoaded', () => {
+            cambiarVistaMain('eliminatorios');
+        });
     </script>
     <script src="./js/ganadores.js"></script>
 </body>
