@@ -8,11 +8,13 @@ async function inicializarFases() {
     if (!container) return;
 
     try {
-        const [resElim, resQuiniela, resResultados, resStandings] = await Promise.all([
+        const idUsuario = localStorage.getItem('idUsuario');
+        const [resElim, resQuiniela, resResultados, resStandings, resDatos] = await Promise.all([
             fetch('./data/eliminatorios.json'),
-            authFetch(`${API_URL}/api/obtener-quiniela/${localStorage.getItem('idUsuario')}`),
+            authFetch(`${API_URL}/api/obtener-quiniela/${idUsuario}`),
             fetch(`${API_URL}/api/obtener-resultados`).catch(() => null),
-            fetch(`${API_URL}/api/standings-reales`).catch(() => null)
+            fetch(`${API_URL}/api/standings-reales`).catch(() => null),
+            authFetch(`${API_URL}/api/mis-datos/${idUsuario}`).catch(() => null)
         ]);
 
         eliminatoriosData = await resElim.json();
@@ -27,6 +29,18 @@ async function inicializarFases() {
         if (resStandings) {
             const dataS = await resStandings.json();
             if (dataS.ok) tablasStandings = dataS.tablas || {};
+        }
+
+        if (resDatos) {
+            const datosSub = await resDatos.json();
+            if (datosSub.ok) {
+                suscripcionActiva = datosSub.suscripcion !== null;
+                if (datosSub.partidosDesbloqueados) {
+                    datosSub.partidosDesbloqueados.forEach(d => {
+                        pronosticosMemoria[d.PartidoId] = { ModificacionesUsadas: d.ModificacionesUsadas };
+                    });
+                }
+            }
         }
 
         // Sincronizar pronósticos guardados
