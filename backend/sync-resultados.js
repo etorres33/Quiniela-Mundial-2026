@@ -271,8 +271,14 @@ async function sincronizarResultados() {
             // Solo partidos finalizados (FINISHED)
             if (match.status !== 'FINISHED') continue;
 
-            const golesLocal     = match.score.fullTime.home;
-            const golesVisitante = match.score.fullTime.away;
+            let golesLocal     = match.score.fullTime.home;
+            let golesVisitante = match.score.fullTime.away;
+
+            // Si el partido se fue a prórroga o penales, usar el marcador de los 90 minutos reglamentarios (regularTime)
+            if (match.score.regularTime && match.score.regularTime.home !== null && typeof match.score.regularTime.home === 'number') {
+                golesLocal     = match.score.regularTime.home;
+                golesVisitante = match.score.regularTime.away;
+            }
             const nombreLocal    = match.homeTeam.name;
             const nombreVisitante = match.awayTeam.name;
 
