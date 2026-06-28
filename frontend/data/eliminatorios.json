@@ -5,10 +5,10 @@
     "num": 73,
     "fecha": "28 Jun 2026",
     "hora": "13:00 hrs",
-    "local": "2° Grupo A",
-    "codLocal": "",
-    "visitante": "2° Grupo B",
-    "codVisitante": "",
+    "local": "Sudáfrica",
+    "codLocal": "ZA",
+    "visitante": "Canadá",
+    "codVisitante": "CA",
     "sede": "Los Ángeles"
   },
   {
@@ -17,10 +17,10 @@
     "num": 74,
     "fecha": "29 Jun 2026",
     "hora": "14:30 hrs",
-    "local": "1° Grupo E",
-    "codLocal": "",
-    "visitante": "Mejor 3° A/B/C/D/F",
-    "codVisitante": "",
+    "local": "Alemania",
+    "codLocal": "DE",
+    "visitante": "Paraguay",
+    "codVisitante": "PY",
     "sede": "Boston"
   },
   {
@@ -29,10 +29,10 @@
     "num": 75,
     "fecha": "29 Jun 2026",
     "hora": "19:00 hrs",
-    "local": "1° Grupo F",
-    "codLocal": "",
-    "visitante": "2° Grupo C",
-    "codVisitante": "",
+    "local": "Países Bajos",
+    "codLocal": "NL",
+    "visitante": "Marruecos",
+    "codVisitante": "MA",
     "sede": "Monterrey"
   },
   {
@@ -41,10 +41,10 @@
     "num": 76,
     "fecha": "29 Jun 2026",
     "hora": "11:00 hrs",
-    "local": "1° Grupo C",
-    "codLocal": "",
-    "visitante": "2° Grupo F",
-    "codVisitante": "",
+    "local": "Brasil",
+    "codLocal": "BR",
+    "visitante": "Japón",
+    "codVisitante": "JP",
     "sede": "Houston"
   },
   {
@@ -53,10 +53,10 @@
     "num": 77,
     "fecha": "30 Jun 2026",
     "hora": "15:00 hrs",
-    "local": "1° Grupo I",
-    "codLocal": "",
-    "visitante": "Mejor 3° C/D/F/G/H",
-    "codVisitante": "",
+    "local": "Francia",
+    "codLocal": "FR",
+    "visitante": "Suecia",
+    "codVisitante": "SE",
     "sede": "Nueva York/Nueva Jersey"
   },
   {
@@ -65,10 +65,10 @@
     "num": 78,
     "fecha": "30 Jun 2026",
     "hora": "11:00 hrs",
-    "local": "2° Grupo E",
-    "codLocal": "",
-    "visitante": "2° Grupo I",
-    "codVisitante": "",
+    "local": "Costa de Marfil",
+    "codLocal": "CI",
+    "visitante": "Noruega",
+    "codVisitante": "NO",
     "sede": "Dallas"
   },
   {
@@ -77,10 +77,10 @@
     "num": 79,
     "fecha": "30 Jun 2026",
     "hora": "19:00 hrs",
-    "local": "1° Grupo A",
-    "codLocal": "",
-    "visitante": "Mejor 3° C/E/F/H/I",
-    "codVisitante": "",
+    "local": "México",
+    "codLocal": "MX",
+    "visitante": "Ecuador",
+    "codVisitante": "EC",
     "sede": "Ciudad de México"
   },
   {
@@ -89,10 +89,10 @@
     "num": 80,
     "fecha": "1 Jul 2026",
     "hora": "10:00 hrs",
-    "local": "1° Grupo L",
-    "codLocal": "",
-    "visitante": "Mejor 3° E/H/I/J/K",
-    "codVisitante": "",
+    "local": "Inglaterra",
+    "codLocal": "GB-ENG",
+    "visitante": "RD Congo",
+    "codVisitante": "CD",
     "sede": "Atlanta"
   },
   {
@@ -101,10 +101,10 @@
     "num": 81,
     "fecha": "1 Jul 2026",
     "hora": "18:00 hrs",
-    "local": "1° Grupo D",
-    "codLocal": "",
-    "visitante": "Mejor 3° B/E/F/I/J",
-    "codVisitante": "",
+    "local": "Estados Unidos",
+    "codLocal": "US",
+    "visitante": "Bosnia y Herzegovina",
+    "codVisitante": "BA",
     "sede": "San Francisco"
   },
   {
@@ -113,10 +113,10 @@
     "num": 82,
     "fecha": "1 Jul 2026",
     "hora": "14:00 hrs",
-    "local": "1° Grupo G",
-    "codLocal": "",
-    "visitante": "Mejor 3° A/E/H/I/J",
-    "codVisitante": "",
+    "local": "Bélgica",
+    "codLocal": "BE",
+    "visitante": "Senegal",
+    "codVisitante": "SN",
     "sede": "Seattle"
   },
   {
@@ -125,10 +125,10 @@
     "num": 83,
     "fecha": "2 Jul 2026",
     "hora": "17:00 hrs",
-    "local": "2° Grupo K",
-    "codLocal": "",
-    "visitante": "2° Grupo L",
-    "codVisitante": "",
+    "local": "Portugal",
+    "codLocal": "PT",
+    "visitante": "Croacia",
+    "codVisitante": "HR",
     "sede": "Toronto"
   },
   {
@@ -137,10 +137,10 @@
     "num": 84,
     "fecha": "2 Jul 2026",
     "hora": "13:00 hrs",
-    "local": "1° Grupo H",
-    "codLocal": "",
-    "visitante": "2° Grupo J",
-    "codVisitante": "",
+    "local": "España",
+    "codLocal": "ES",
+    "visitante": "Austria",
+    "codVisitante": "AT",
     "sede": "Los Ángeles"
   },
   {
@@ -149,10 +149,10 @@
     "num": 85,
     "fecha": "2 Jul 2026",
     "hora": "21:00 hrs",
-    "local": "1° Grupo B",
-    "codLocal": "",
-    "visitante": "Mejor 3° E/F/G/I/J",
-    "codVisitante": "",
+    "local": "Suiza",
+    "codLocal": "CH",
+    "visitante": "Argelia",
+    "codVisitante": "DZ",
     "sede": "Vancouver"
   },
   {
@@ -161,10 +161,10 @@
     "num": 86,
     "fecha": "3 Jul 2026",
     "hora": "16:00 hrs",
-    "local": "1° Grupo J",
-    "codLocal": "",
-    "visitante": "2° Grupo H",
-    "codVisitante": "",
+    "local": "Argentina",
+    "codLocal": "AR",
+    "visitante": "Cabo Verde",
+    "codVisitante": "CV",
     "sede": "Miami"
   },
   {
@@ -173,10 +173,10 @@
     "num": 87,
     "fecha": "3 Jul 2026",
     "hora": "19:30 hrs",
-    "local": "1° Grupo K",
-    "codLocal": "",
-    "visitante": "Mejor 3° D/E/I/J/L",
-    "codVisitante": "",
+    "local": "Colombia",
+    "codLocal": "CO",
+    "visitante": "Ghana",
+    "codVisitante": "GH",
     "sede": "Kansas City"
   },
   {
@@ -185,10 +185,10 @@
     "num": 88,
     "fecha": "3 Jul 2026",
     "hora": "12:00 hrs",
-    "local": "2° Grupo D",
-    "codLocal": "",
-    "visitante": "2° Grupo G",
-    "codVisitante": "",
+    "local": "Australia",
+    "codLocal": "AU",
+    "visitante": "Egipto",
+    "codVisitante": "EG",
     "sede": "Dallas"
   },
   {

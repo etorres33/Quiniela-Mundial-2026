@@ -247,16 +247,9 @@ async function sincronizarResultados() {
             todosLosPartidos = todosLosPartidos.concat(JSON.parse(fs.readFileSync(elimPath, 'utf8')));
         }
 
-        // Obtenemos partidos de ayer y hoy para evitar perder resultados por diferencias horarias (timezones)
-        const dateNow = new Date();
-        const dateYesterday = new Date();
-        dateYesterday.setDate(dateNow.getDate() - 1);
-
-        const dateFrom = dateYesterday.toISOString().split('T')[0];
-        const dateTo = dateNow.toISOString().split('T')[0];
-
+        // Obtenemos todos los partidos del torneo para sincronizar resultados y resolver cruces
         const response = await fetch(
-            `${API_URL}/competitions/WC/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
+            `${API_URL}/competitions/WC/matches`,
             { headers: { 'X-Auth-Token': API_KEY } }
         );
 
@@ -445,6 +438,85 @@ async function sincronizarResultados() {
 
                 console.log(`✅ Pendiente agregado (requiere mapeo manual): ${nombreLocal} ${golesLocal}-${golesVisitante} ${nombreVisitante}`);
             }
+        }
+
+        // ─── RESOLVER EQUIPOS DE FASES ELIMINATORIAS ───
+        try {
+            const backendElimsPath = path.join(__dirname, 'data', 'eliminatorios.json');
+            const frontendElimsPath = path.join(__dirname, '..', 'frontend', 'data', 'eliminatorios.json');
+
+            if (fs.existsSync(backendElimsPath)) {
+                const elims = JSON.parse(fs.readFileSync(backendElimsPath, 'utf8'));
+                const partidos = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'partidos.json'), 'utf8'));
+
+                // Base de datos de equipos en español
+                const mapSpanishTeams = {};
+                partidos.forEach(p => {
+                    const normL = normalizarTexto(p.local);
+                    mapSpanishTeams[normL] = { nombre: p.local, cod: p.codLocal };
+                    const normV = normalizarTexto(p.visitante);
+                    mapSpanishTeams[normV] = { nombre: p.visitante, cod: p.codVisitante };
+                });
+                // Mapeo manual para Marruecos
+                mapSpanishTeams[normalizarTexto('morocco')] = { nombre: 'Marruecos', cod: 'MA' };
+
+                function translateTeam(apiName) {
+                    if (!apiName || apiName.includes('TBD') || apiName.includes('Winner') || apiName.includes('Runner-up') || apiName.includes('To Be Decided')) {
+                        return null;
+                    }
+                    const normAPI = normalizarTexto(apiName);
+                    const trad = traductoresEquipos[normAPI] || normAPI;
+                    if (mapSpanishTeams[trad]) return mapSpanishTeams[trad];
+                    const fuzzyKey = Object.keys(mapSpanishTeams).find(key => key.includes(trad) || trad.includes(key));
+                    if (fuzzyKey) return mapSpanishTeams[fuzzyKey];
+                    return { nombre: apiName, cod: '' };
+                }
+
+                const sortedElims = [...elims].sort((a, b) => {
+                    const tA = a.hora.replace(' hrs', '');
+                    const tB = b.hora.replace(' hrs', '');
+                    return new Date(`${a.fecha} ${tA}:00 GMT-0600`).getTime() - new Date(`${b.fecha} ${tB}:00 GMT-0600`).getTime();
+                });
+
+                const sortedApiKnockouts = data.matches
+                    .filter(m => m.stage !== 'GROUP_STAGE')
+                    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+
+                let elimsChanged = false;
+                const minCount = Math.min(sortedElims.length, sortedApiKnockouts.length);
+
+                for (let i = 0; i < minCount; i++) {
+                    const e = sortedElims[i];
+                    const a = sortedApiKnockouts[i];
+
+                    const resolvedLocal = translateTeam(a.homeTeam?.name);
+                    const resolvedVisitante = translateTeam(a.awayTeam?.name);
+
+                    if (resolvedLocal && resolvedVisitante) {
+                        const originalMatch = elims.find(item => item.id === e.id);
+                        if (originalMatch) {
+                            if (originalMatch.local !== resolvedLocal.nombre || originalMatch.visitante !== resolvedVisitante.nombre) {
+                                console.log(`🔄 Resolviendo rivales para Partido #${e.id}: ${resolvedLocal.nombre} vs ${resolvedVisitante.nombre}`);
+                                originalMatch.local = resolvedLocal.nombre;
+                                originalMatch.codLocal = resolvedLocal.cod;
+                                originalMatch.visitante = resolvedVisitante.nombre;
+                                originalMatch.codVisitante = resolvedVisitante.cod;
+                                elimsChanged = true;
+                            }
+                        }
+                    }
+                }
+
+                if (elimsChanged) {
+                    fs.writeFileSync(backendElimsPath, JSON.stringify(elims, null, 2), 'utf8');
+                    if (fs.existsSync(path.dirname(frontendElimsPath))) {
+                        fs.writeFileSync(frontendElimsPath, JSON.stringify(elims, null, 2), 'utf8');
+                    }
+                    console.log('✅ Archivos eliminatorios.json actualizados automáticamente.');
+                }
+            }
+        } catch (elimErr) {
+            console.error('⚠️ Error al resolver equipos eliminatorios:', elimErr.message);
         }
 
         if (hayCambios) {
