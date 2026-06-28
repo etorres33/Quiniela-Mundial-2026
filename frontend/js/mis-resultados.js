@@ -23,8 +23,13 @@ async function cargarMecanicaResultados() {
     if (!idUsuario) { window.location.href = "login.html"; return; }
 
     try {
-        const responsePartidos = await fetch("./data/partidos.json");
+        const [responsePartidos, responseElims] = await Promise.all([
+            fetch("./data/partidos.json"),
+            fetch("./data/eliminatorios.json")
+        ]);
         const partidosJSON = await responsePartidos.json();
+        const elimsJSON = await responseElims.json();
+        const todosLosPartidos = partidosJSON.concat(elimsJSON);
 
         const responseDB = await authFetch(`${API_URL}/api/mis-resultados/${idUsuario}`);
         const data = await responseDB.json();
@@ -43,7 +48,7 @@ async function cargarMecanicaResultados() {
         document.getElementById("barEfectividad").style.width = data.efectividad;
 
         historialCompletoGlobal = data.historial.map(item => {
-            const infoPartidoEstatico = partidosJSON.find(p => p.id === item.partidoId);
+            const infoPartidoEstatico = todosLosPartidos.find(p => p.id === item.partidoId);
             return {
                 ...item,
                 local: infoPartidoEstatico ? infoPartidoEstatico.local : "Desconocido",
