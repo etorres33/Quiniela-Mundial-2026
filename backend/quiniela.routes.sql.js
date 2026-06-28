@@ -10,9 +10,15 @@ const crypto     = require('crypto');
 let partidos = [];
 try {
     const dataPath = path.join(__dirname, 'data', 'partidos.json');
-    partidos = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    const pData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    let eData = [];
+    const elimPath = path.join(__dirname, 'data', 'eliminatorios.json');
+    if (fs.existsSync(elimPath)) {
+        eData = JSON.parse(fs.readFileSync(elimPath, 'utf8'));
+    }
+    partidos = pData.concat(eData);
 } catch (err) {
-    console.error('Error al cargar partidos.json en el backend:', err);
+    console.error('Error al cargar partidos en el backend:', err);
 }
 
 async function registrarLogActividad({ idUsuario, accion, partidoId, detalle, exito, errorMessage }) {
