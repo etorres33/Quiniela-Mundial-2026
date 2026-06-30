@@ -193,6 +193,12 @@ function resolverEquipo(descripcion) {
             return { nombre: partido.local,     cod: partido.codLocal };
         if (res.GolesLocal < res.GolesVisitante)
             return { nombre: partido.visitante, cod: partido.codVisitante };
+        if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+            if (res.PenalesLocal > res.PenalesVisitante)
+                return { nombre: partido.local,     cod: partido.codLocal };
+            if (res.PenalesLocal < res.PenalesVisitante)
+                return { nombre: partido.visitante, cod: partido.codVisitante };
+        }
         return { nombre: `${partido.local} / ${partido.visitante}`, cod: '', empate: true };
     }
 
@@ -260,7 +266,13 @@ function renderizarBracket() {
             const p=eliminatorios.find(x=>x.id===id)||partidosGlobal.find(x=>x.id===id);
             if (!p) return {nombre:`W${id}`,cod:'',pendiente:true};
             const lR=resolverEq(p.local),vR=resolverEq(p.visitante);
-            return res.GolesLocal>res.GolesVisitante?lR:res.GolesLocal<res.GolesVisitante?vR:{nombre:`W${id}`,cod:'',pendiente:true};
+            if (res.GolesLocal > res.GolesVisitante) return lR;
+            if (res.GolesLocal < res.GolesVisitante) return vR;
+            if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+                if (res.PenalesLocal > res.PenalesVisitante) return lR;
+                if (res.PenalesLocal < res.PenalesVisitante) return vR;
+            }
+            return {nombre:`W${id}`,cod:'',pendiente:true};
         }
         if (/^Perdedor G\d+$/.test(desc)) {
             const id=parseInt(desc.replace('Perdedor G','')),res=resultadosGlobal[id];
@@ -268,7 +280,13 @@ function renderizarBracket() {
             const p=eliminatorios.find(x=>x.id===id);
             if (!p) return {nombre:`RU${id}`,cod:'',pendiente:true};
             const lR=resolverEq(p.local),vR=resolverEq(p.visitante);
-            return res.GolesLocal<res.GolesVisitante?lR:res.GolesLocal>res.GolesVisitante?vR:{nombre:`RU${id}`,cod:'',pendiente:true};
+            if (res.GolesLocal < res.GolesVisitante) return lR;
+            if (res.GolesLocal > res.GolesVisitante) return vR;
+            if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+                if (res.PenalesLocal < res.PenalesVisitante) return lR;
+                if (res.PenalesLocal > res.PenalesVisitante) return vR;
+            }
+            return {nombre:`RU${id}`,cod:'',pendiente:true};
         }
         const m1=desc.match(/^1° Grupo ([A-L])$/);
         if (m1){const t=tablaGlobal[m1[1]];return t&&t[0]?{nombre:t[0].nombre,cod:t[0].cod,pendiente:false}:{nombre:`1${m1[1]}`,cod:'',pendiente:true};}
@@ -289,8 +307,17 @@ function renderizarBracket() {
         const loc=teamLabel(p.local),vis=teamLabel(p.visitante);
         let lC='',vC='';
         if(res){
-            lC=res.GolesLocal>res.GolesVisitante?'winner':res.GolesLocal<res.GolesVisitante?'loser':'';
-            vC=res.GolesVisitante>res.GolesLocal?'winner':res.GolesVisitante<res.GolesLocal?'loser':'';
+            if (res.GolesLocal > res.GolesVisitante) {
+                lC = 'winner'; vC = 'loser';
+            } else if (res.GolesLocal < res.GolesVisitante) {
+                lC = 'loser'; vC = 'winner';
+            } else if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+                if (res.PenalesLocal > res.PenalesVisitante) {
+                    lC = 'winner'; vC = 'loser';
+                } else if (res.PenalesLocal < res.PenalesVisitante) {
+                    lC = 'loser'; vC = 'winner';
+                }
+            }
         }
         let bC = '';
         if (isFinal) bC += ' final-match';
@@ -307,11 +334,11 @@ function renderizarBracket() {
                 <div class="bk3-box ${bC}">
                     <div class="bk3-team ${lC} ${!res&&loc.pendiente?'pending':''}">
                         <span class="bk3-name">${escapeHTML(loc.label)}</span>
-                        ${res?`<span class="bk3-score">${res.GolesLocal}</span>`:''}
+                        ${res?`<span class="bk3-score">${res.GolesLocal}${res.PenalesLocal !== null && res.PenalesLocal !== undefined ? ` (${res.PenalesLocal})` : ''}</span>`:''}
                     </div>
                     <div class="bk3-team ${vC} ${!res&&vis.pendiente?'pending':''}">
                         <span class="bk3-name">${escapeHTML(vis.label)}</span>
-                        ${res?`<span class="bk3-score">${res.GolesVisitante}</span>`:''}
+                        ${res?`<span class="bk3-score">${res.GolesVisitante}${res.PenalesVisitante !== null && res.PenalesVisitante !== undefined ? ` (${res.PenalesVisitante})` : ''}</span>`:''}
                     </div>
                 </div>
             </div>

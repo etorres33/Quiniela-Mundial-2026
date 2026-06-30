@@ -96,6 +96,9 @@ function renderizarPartidosAdmin(lista) {
         const reg = resultadosGuardadosBD.find(r => r.PartidoId === partido.id);
         const gL  = partido.resultadoLocal     !== undefined ? partido.resultadoLocal     : (reg ? reg.GolesLocal     : "");
         const gV  = partido.resultadoVisitante !== undefined ? partido.resultadoVisitante : (reg ? reg.GolesVisitante : "");
+        const pL  = reg && reg.PenalesLocal !== undefined && reg.PenalesLocal !== null ? reg.PenalesLocal : "";
+        const pV  = reg && reg.PenalesVisitante !== undefined && reg.PenalesVisitante !== null ? reg.PenalesVisitante : "";
+        const esEliminatorio = !partido.grupo || partido.id >= 73;
 
         const row = document.createElement("div");
         row.className = "quiniela-row admin-partido-row-grid";
@@ -111,11 +114,60 @@ function renderizarPartidosAdmin(lista) {
 
         const predDiv = document.createElement("div"); predDiv.className = "prediction";
         const iL = document.createElement("input"); iL.type="number"; iL.className="goles-local"; iL.min="0"; iL.placeholder="-"; iL.value=gL;
-        iL.addEventListener("input", e => { partido.resultadoLocal = e.target.value; });
         const dash = document.createElement("span"); dash.className="dash"; dash.textContent="-";
         const iV = document.createElement("input"); iV.type="number"; iV.className="goles-visitante"; iV.min="0"; iV.placeholder="-"; iV.value=gV;
-        iV.addEventListener("input", e => { partido.resultadoVisitante = e.target.value; });
         predDiv.append(iL, dash, iV);
+
+        // Contenedor de penales
+        const pDiv = document.createElement("div");
+        pDiv.className = "penales-admin-container";
+        pDiv.style.alignItems = "center";
+        pDiv.style.gap = "0.2rem";
+        pDiv.style.marginLeft = "0.5rem";
+
+        const pLInput = document.createElement("input");
+        pLInput.type = "number";
+        pLInput.className = "goles-local-penales";
+        pLInput.min = "0";
+        pLInput.placeholder = "P.Loc";
+        pLInput.value = pL;
+        pLInput.style.width = "40px";
+        pLInput.style.height = "28px";
+        pLInput.style.fontSize = "0.85rem";
+        pLInput.style.textAlign = "center";
+        pLInput.style.borderRadius = "4px";
+
+        const pVInput = document.createElement("input");
+        pVInput.type = "number";
+        pVInput.className = "goles-visitante-penales";
+        pVInput.min = "0";
+        pVInput.placeholder = "P.Vis";
+        pVInput.value = pV;
+        pVInput.style.width = "40px";
+        pVInput.style.height = "28px";
+        pVInput.style.fontSize = "0.85rem";
+        pVInput.style.textAlign = "center";
+        pVInput.style.borderRadius = "4px";
+
+        const pLabel = document.createElement("small");
+        pLabel.textContent = "Pen:";
+        pLabel.style.color = "#7a8aa0";
+        pLabel.style.fontSize = "0.8rem";
+
+        pDiv.append(pLabel, pLInput, document.createTextNode("-"), pVInput);
+        predDiv.appendChild(pDiv);
+
+        function checkShowPenales() {
+            if (esEliminatorio && iL.value !== "" && iV.value !== "" && parseInt(iL.value) === parseInt(iV.value)) {
+                pDiv.style.display = "flex";
+            } else {
+                pDiv.style.display = "none";
+            }
+        }
+
+        iL.addEventListener("input", e => { partido.resultadoLocal = e.target.value; checkShowPenales(); });
+        iV.addEventListener("input", e => { partido.resultadoVisitante = e.target.value; checkShowPenales(); });
+        checkShowPenales();
 
         const dateDiv = document.createElement("div"); dateDiv.className="date";
         const ci = document.createElement("i"); ci.className="bx bx-time-five";
@@ -126,7 +178,11 @@ function renderizarPartidosAdmin(lista) {
 
         const btn = document.createElement("button");
         btn.className = "btn-registrar-fila"; btn.textContent = "✔ Registrar";
-        btn.addEventListener("click", () => enviarResultadoOficial(partido.id, iL.value, iV.value, btn, partido.local, partido.visitante));
+        btn.addEventListener("click", () => {
+            const pLVal = pLInput.value !== "" ? parseInt(pLInput.value) : null;
+            const pVVal = pVInput.value !== "" ? parseInt(pVInput.value) : null;
+            enviarResultadoOficial(partido.id, iL.value, iV.value, pLVal, pVVal, btn, partido.local, partido.visitante);
+        });
 
         if (reg) {
             row.classList.add("partido-registrado-admin");
@@ -137,13 +193,26 @@ function renderizarPartidosAdmin(lista) {
     });
 }
 
-async function enviarResultadoOficial(partidoId, gL, gV, btn, local, visitante) {
+async function enviarResultadoOficial(partidoId, gL, gV, penalesLocal, penalesVisitante, btn, local, visitante) {
     const msg = document.getElementById("adminMensaje");
     if (gL===""||gV==="") { msg.textContent="⚠️ Ingresa ambos marcadores."; msg.style.color="#e74c3c"; return; }
+    if (gL === gV && (penalesLocal === null || penalesVisitante === null || isNaN(penalesLocal) || isNaN(penalesVisitante)) && (partidoId >= 73)) {
+        msg.textContent = "⚠️ Para partidos eliminatorios empatados, debes ingresar el resultado de penales.";
+        msg.style.color = "#e74c3c";
+        return;
+    }
     try {
         const res  = await adminFetch(`${API_URL}/api/guardar-resultado`, {
             method:"POST", headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({ partidoId:parseInt(partidoId), golesLocal:parseInt(gL), golesVisitante:parseInt(gV), local, visitante })
+            body: JSON.stringify({ 
+                partidoId:parseInt(partidoId), 
+                golesLocal:parseInt(gL), 
+                golesVisitante:parseInt(gV), 
+                penalesLocal: penalesLocal !== null && !isNaN(penalesLocal) ? parseInt(penalesLocal) : null,
+                penalesVisitante: penalesVisitante !== null && !isNaN(penalesVisitante) ? parseInt(penalesVisitante) : null,
+                local, 
+                visitante 
+            })
         });
         const data = await res.json();
         msg.textContent = data.message;
@@ -153,7 +222,12 @@ async function enviarResultadoOficial(partidoId, gL, gV, btn, local, visitante) 
             const fila = btn.closest(".quiniela-row");
             if (fila) { fila.classList.add("partido-registrado-admin"); }
             const idx = partidosAdminGlobal.findIndex(p=>p.id===partidoId);
-            if (idx!==-1) { partidosAdminGlobal[idx].resultadoLocal=gL; partidosAdminGlobal[idx].resultadoVisitante=gV; }
+            if (idx!==-1) { 
+                partidosAdminGlobal[idx].resultadoLocal=gL; 
+                partidosAdminGlobal[idx].resultadoVisitante=gV; 
+                partidosAdminGlobal[idx].resultadoPenalesLocal=penalesLocal;
+                partidosAdminGlobal[idx].resultadoPenalesVisitante=penalesVisitante;
+            }
             // Actualizar bolsa después de registrar
             inicializarPanelBolsa();
         }

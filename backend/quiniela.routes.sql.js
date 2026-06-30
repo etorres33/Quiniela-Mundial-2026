@@ -272,19 +272,21 @@ router.post('/desbloquear-partido', async (req, res) => {
 // ─── GUARDAR RESULTADO OFICIAL ────────────────────────────────────────────────
 router.post('/guardar-resultado', validarTokenAdmin, async (req, res) => {
     try {
-        const { partidoId, golesLocal, golesVisitante, local, visitante } = req.body;
-        resultadoRealSchema.parse({ partidoId, golesLocal, golesVisitante });
+        const { partidoId, golesLocal, golesVisitante, penalesLocal, penalesVisitante, local, visitante } = req.body;
+        resultadoRealSchema.parse({ partidoId, golesLocal, golesVisitante, penalesLocal, penalesVisitante });
         const pool = await poolPromise;
 
         await pool.request()
             .input('PartidoId',      sql.Int, partidoId)
             .input('GolesLocal',     sql.Int, golesLocal)
             .input('GolesVisitante', sql.Int, golesVisitante)
+            .input('PenalesLocal',   sql.Int, penalesLocal !== undefined && penalesLocal !== null ? penalesLocal : null)
+            .input('PenalesVisitante', sql.Int, penalesVisitante !== undefined && penalesVisitante !== null ? penalesVisitante : null)
             .query(`
                 IF EXISTS (SELECT 1 FROM dbo.ResultadosReales WHERE PartidoId=@PartidoId)
-                    UPDATE dbo.ResultadosReales SET GolesLocal=@GolesLocal, GolesVisitante=@GolesVisitante WHERE PartidoId=@PartidoId
+                    UPDATE dbo.ResultadosReales SET GolesLocal=@GolesLocal, GolesVisitante=@GolesVisitante, PenalesLocal=@PenalesLocal, PenalesVisitante=@PenalesVisitante WHERE PartidoId=@PartidoId
                 ELSE
-                    INSERT INTO dbo.ResultadosReales (PartidoId,GolesLocal,GolesVisitante) VALUES (@PartidoId,@GolesLocal,@GolesVisitante)
+                    INSERT INTO dbo.ResultadosReales (PartidoId,GolesLocal,GolesVisitante,PenalesLocal,PenalesVisitante) VALUES (@PartidoId,@GolesLocal,@GolesVisitante,@PenalesLocal,@PenalesVisitante)
             `);
 
         res.json({ ok: true, message: 'Resultado guardado. Enviando notificaciones...' });
@@ -314,7 +316,14 @@ router.post('/guardar-resultado', validarTokenAdmin, async (req, res) => {
 router.get('/obtener-resultados', async (req, res) => {
     try {
         const pool   = await poolPromise;
-        const result = await pool.request().query(`SELECT PartidoId, GolesLocal, GolesVisitante FROM dbo.ResultadosReales`);
+        const result = await pool.request().query(`
+            SELECT PartidoId, 
+                   GolesLocal, 
+                   GolesVisitante,
+                   PenalesLocal AS PenalesLocal,
+                   PenalesVisitante AS PenalesVisitante
+            FROM dbo.ResultadosReales
+        `);
         return res.json({ ok: true, resultados: result.recordset });
     } catch (error) {
         return res.status(500).json({ ok: false, message: 'Error.' });

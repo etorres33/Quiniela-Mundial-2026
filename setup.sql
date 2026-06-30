@@ -77,10 +77,12 @@ CREATE TABLE pronosticos (
 
 -- Resultados reales
 CREATE TABLE resultados_reales (
-    id_resultado    SERIAL PRIMARY KEY,
-    partido_id      INT NOT NULL UNIQUE,
-    goles_local     INT NOT NULL,
-    goles_visitante INT NOT NULL
+    id_resultado      SERIAL PRIMARY KEY,
+    partido_id        INT NOT NULL UNIQUE,
+    goles_local       INT NOT NULL,
+    goles_visitante   INT NOT NULL,
+    penales_local     INT,
+    penales_visitante INT
 );
 
 -- Puntajes

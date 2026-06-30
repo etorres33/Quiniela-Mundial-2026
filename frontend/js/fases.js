@@ -74,6 +74,10 @@ function resolverEquipoFase(desc) {
         const lR = resolverEquipoFase(p.local), vR = resolverEquipoFase(p.visitante);
         if (res.GolesLocal  > res.GolesVisitante) return lR;
         if (res.GolesLocal  < res.GolesVisitante) return vR;
+        if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+            if (res.PenalesLocal > res.PenalesVisitante) return lR;
+            if (res.PenalesLocal < res.PenalesVisitante) return vR;
+        }
         return { nombre: `M${id}`, cod: '', pendiente: true };
     }
 
@@ -87,6 +91,10 @@ function resolverEquipoFase(desc) {
         const lR = resolverEquipoFase(p.local), vR = resolverEquipoFase(p.visitante);
         if (res.GolesLocal  < res.GolesVisitante) return lR;
         if (res.GolesLocal  > res.GolesVisitante) return vR;
+        if (res.PenalesLocal !== undefined && res.PenalesLocal !== null && res.PenalesVisitante !== undefined && res.PenalesVisitante !== null) {
+            if (res.PenalesLocal < res.PenalesVisitante) return lR;
+            if (res.PenalesLocal > res.PenalesVisitante) return vR;
+        }
         return { nombre: desc, cod: '', pendiente: true };
     }
 
@@ -243,7 +251,11 @@ function crearFilaPartidoFase(partido) {
         estadoDiv.innerHTML = `<span class="badge-estado-partido sin-plan" style="font-size:.75rem;">⏳ Por definir</span>`;
     } else if (realResult) {
         inputLocal.readOnly = inputVisitante.readOnly = true;
-        estadoDiv.innerHTML = `<span class="badge-estado-partido finalizado" style="font-size:.75rem;">🏁 ${realResult.GolesLocal} - ${realResult.GolesVisitante}</span>`;
+        let marcador = `🏁 ${realResult.GolesLocal} - ${realResult.GolesVisitante}`;
+        if (realResult.PenalesLocal !== undefined && realResult.PenalesLocal !== null && realResult.PenalesVisitante !== undefined && realResult.PenalesVisitante !== null) {
+            marcador += ` (${realResult.PenalesLocal}-${realResult.PenalesVisitante} P)`;
+        }
+        estadoDiv.innerHTML = `<span class="badge-estado-partido finalizado" style="font-size:.75rem;">${marcador}</span>`;
     } else if (yaEmpezó) {
         inputLocal.readOnly = inputVisitante.readOnly = true;
         estadoDiv.innerHTML = `<span class="badge-estado-partido en-juego">

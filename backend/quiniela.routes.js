@@ -159,7 +159,9 @@ const quinielaSchema = z.object({
 const resultadoRealSchema = z.object({
     partidoId:      z.number().int().min(1),
     golesLocal:     z.number().int().min(0).max(50),
-    golesVisitante: z.number().int().min(0).max(50)
+    golesVisitante: z.number().int().min(0).max(50),
+    penalesLocal:   z.number().int().min(0).max(50).optional().nullable(),
+    penalesVisitante: z.number().int().min(0).max(50).optional().nullable()
 });
 
 const campeonSchema = z.object({
@@ -422,14 +424,14 @@ router.post('/desbloquear-partido', async (req, res) => {
 // ─── GUARDAR RESULTADO OFICIAL ────────────────────────────────────────────────
 router.post('/guardar-resultado', validarTokenAdmin, async (req, res) => {
     try {
-        const { partidoId, golesLocal, golesVisitante, local, visitante } = req.body;
-        resultadoRealSchema.parse({ partidoId, golesLocal, golesVisitante });
+        const { partidoId, golesLocal, golesVisitante, penalesLocal, penalesVisitante, local, visitante } = req.body;
+        resultadoRealSchema.parse({ partidoId, golesLocal, golesVisitante, penalesLocal, penalesVisitante });
 
         await query(
-            `INSERT INTO resultados_reales (partido_id, goles_local, goles_visitante)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (partido_id) DO UPDATE SET goles_local=$2, goles_visitante=$3`,
-            [partidoId, golesLocal, golesVisitante]
+            `INSERT INTO resultados_reales (partido_id, goles_local, goles_visitante, penales_local, penales_visitante)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (partido_id) DO UPDATE SET goles_local=$2, goles_visitante=$3, penales_local=$4, penales_visitante=$5`,
+            [partidoId, golesLocal, golesVisitante, penalesLocal !== undefined && penalesLocal !== null ? penalesLocal : null, penalesVisitante !== undefined && penalesVisitante !== null ? penalesVisitante : null]
         );
 
         res.json({ ok: true, message: 'Resultado oficial guardado. Enviando notificaciones...' });
@@ -467,7 +469,14 @@ router.post('/guardar-resultado', validarTokenAdmin, async (req, res) => {
 // ─── OBTENER RESULTADOS ───────────────────────────────────────────────────────
 router.get('/obtener-resultados', async (req, res) => {
     try {
-        const result = await query(`SELECT partido_id AS "PartidoId", goles_local AS "GolesLocal", goles_visitante AS "GolesVisitante" FROM resultados_reales`);
+        const result = await query(`
+            SELECT partido_id AS "PartidoId", 
+                   goles_local AS "GolesLocal", 
+                   goles_visitante AS "GolesVisitante",
+                   penales_local AS "PenalesLocal",
+                   penales_visitante AS "PenalesVisitante"
+            FROM resultados_reales
+        `);
         return res.json({ ok: true, resultados: result.rows });
     } catch (error) {
         return res.status(500).json({ ok: false, message: 'Error.' });

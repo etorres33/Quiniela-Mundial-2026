@@ -126,6 +126,13 @@ async function query(text, params) {
             );
         `);
         console.log('✅ Tabla partidos_revelados verificada/creada.');
+
+        // Crear columnas penales_local y penales_visitante en resultados_reales si no existen
+        await pool.query(`
+            ALTER TABLE resultados_reales ADD COLUMN IF NOT EXISTS penales_local INT;
+            ALTER TABLE resultados_reales ADD COLUMN IF NOT EXISTS penales_visitante INT;
+        `);
+        console.log('✅ Columnas penales_local y penales_visitante verificadas/creadas en resultados_reales.');
     } catch (err) {
         console.error('❌ Error al verificar/crear tabla/columna:', err);
     }
