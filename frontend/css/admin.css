@@ -80,11 +80,9 @@ body{
     opacity: 0.75; /* Atenúa un poco la fila para indicar estatus "histórico" */
 }
 
-/* Congela la interacción de los inputs de goles ya cargados */
+/* Permite la interacción de los inputs de goles ya cargados para poder corregirlos o agregar penales */
 .quiniela-row.partido-registrado-admin .prediction input {
-    cursor: not-allowed;
-    pointer-events: none; /* Bloquea clics y scroll de números */
-    background: rgba(255, 255, 255, 0.77);
+    background: rgba(255, 255, 255, 0.9);
 }
 
 /* 🔒 ESTILO DEL BOTÓN DE REGISTRAR CUANDO YA ESTÁ DESHABILITADO */
