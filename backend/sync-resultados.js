@@ -274,10 +274,29 @@ async function sincronizarResultados() {
             let golesLocal     = match.score.fullTime.home;
             let golesVisitante = match.score.fullTime.away;
 
-            // Si el partido se fue a prórroga o penales, usar el marcador de los 90 minutos reglamentarios (regularTime)
-            if (match.score.regularTime && match.score.regularTime.home !== null && typeof match.score.regularTime.home === 'number') {
-                golesLocal     = match.score.regularTime.home;
-                golesVisitante = match.score.regularTime.away;
+            // Si el partido se fue a prórroga o penales (duración EXTRA_TIME o PENALTY_SHOOTOUT)
+            if (match.score.duration === 'EXTRA_TIME' || match.score.duration === 'PENALTY_SHOOTOUT') {
+                if (match.score.regularTime && match.score.regularTime.home !== null && typeof match.score.regularTime.home === 'number') {
+                    golesLocal     = match.score.regularTime.home;
+                    golesVisitante = match.score.regularTime.away;
+                } else if (match.score.extraTime && match.score.extraTime.home !== null && typeof match.score.extraTime.home === 'number') {
+                    // Fallback de seguridad: calcular regularTime restando extraTime a fullTime
+                    golesLocal     = match.score.fullTime.home - match.score.extraTime.home;
+                    golesVisitante = match.score.fullTime.away - match.score.extraTime.away;
+                } else {
+                    // Si no hay datos de tiempo regular aún en la API pero sabemos que se fue a prórroga,
+                    // por definición el marcador de los 90 minutos reglamentarios debió terminar en empate.
+                    // Para evitar tomar el marcador con prórroga (fullTime), omitimos procesar este partido
+                    // temporalmente hasta que la API complete la actualización de desgloses.
+                    console.log(`⚠️ Partido #${match.id} terminó en prórroga/penales pero la API no ha reportado regularTime/extraTime detallado aún. Omitiendo temporalmente para evitar guardar marcador incorrecto.`);
+                    continue;
+                }
+            } else {
+                // Caso regular (90 min)
+                if (match.score.regularTime && match.score.regularTime.home !== null && typeof match.score.regularTime.home === 'number') {
+                    golesLocal     = match.score.regularTime.home;
+                    golesVisitante = match.score.regularTime.away;
+                }
             }
             const nombreLocal    = match.homeTeam.name;
             const nombreVisitante = match.awayTeam.name;
@@ -355,7 +374,7 @@ async function sincronizarResultados() {
                         `INSERT INTO resultados_pendientes 
                          (fixture_id, local_nombre, visitante_nombre, goles_local, goles_visitante, fecha_partido, validado, fecha_validacion, partido_id)
                          VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW(), $7)`,
-                        [match.id, nombreLocal, nombreVisitante, golesLocal, golesVisitante, new Date(match.utcDate), partidoId]
+                        [match.id, nombreLocal, nombreVisitante, golesLocalFinal, golesVisitanteFinal, new Date(match.utcDate), partidoId]
                     );
                 }
 
