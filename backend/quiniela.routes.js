@@ -1015,6 +1015,118 @@ router.post('/admin/revelar-ganadores', async (req, res) => {
     }
 });
 
+// ─── ADMIN: REVELAR GANADORES CON FE DE ERRATAS ──────────────────────────────
+router.post('/admin/fe-de-erratas', validarTokenAdmin, async (req, res) => {
+    try {
+        // 1. Limpiar los ganadores anteriores
+        await query(`DELETE FROM ganadores_finales`);
+        await query(`UPDATE config_quiniela SET valor='0' WHERE clave='GanadoresRevelados'`);
+
+        const configBolsaResult = await query(`SELECT clave, valor FROM config_bolsa`);
+        const configBolsa = {};
+        configBolsaResult.rows.forEach(r => {
+            configBolsa[r.clave] = parseFloat(r.valor);
+        });
+
+        const pctAdmin   = configBolsa['PctAdmin']   ?? 15.00;
+        const pctPremio1 = configBolsa['PctPremio1'] ?? 50.00;
+        const pctPremio2 = configBolsa['PctPremio2'] ?? 30.00;
+        const pctPremio3 = configBolsa['PctPremio3'] ?? 20.00;
+
+        const bolsaR  = await query(`SELECT COALESCE(SUM(monto),0) AS total FROM bolsa`);
+        const totalRecaudado = parseFloat(bolsaR.rows[0].total) || 0;
+        const cuotaAdmin         = totalRecaudado * (pctAdmin / 100);
+        const bolsaPremios       = totalRecaudado - cuotaAdmin;
+        const premio1 = bolsaPremios * (pctPremio1 / 100);
+        const premio2 = bolsaPremios * (pctPremio2 / 100);
+        const premio3 = bolsaPremios * (pctPremio3 / 100);
+
+        const ranking = await obtenerTablaGeneralRankings();
+        const groups = {};
+        ranking.forEach(u => {
+            if (!groups[u.Posicion]) groups[u.Posicion] = [];
+            groups[u.Posicion].push(u);
+        });
+
+        const sortedRanks = Object.keys(groups).map(Number).sort((a,b) => a - b);
+        const prizes = [premio1, premio2, premio3];
+        let distribucion = [];
+
+        let prizeIdx = 0;
+        for (const rk of sortedRanks) {
+            if (prizeIdx >= prizes.length) break;
+            const groupUsers = groups[rk];
+            const L = groupUsers.length;
+            const groupPrizes = prizes.slice(prizeIdx, prizeIdx + L);
+            prizeIdx += L;
+
+            if (groupPrizes.length === 0) break;
+
+            const sumPrizes = groupPrizes.reduce((a,b) => a + b, 0);
+            const prizePerUser = sumPrizes / L;
+            const pctPerUser = ((sumPrizes / bolsaPremios) * 100 / L).toFixed(2);
+
+            groupUsers.forEach(u => {
+                distribucion.push({
+                    IdUsuario: u.IdUsuario,
+                    Nombre: u.Nombre,
+                    Puntos: u.Puntos,
+                    Posicion: u.Posicion,
+                    montoPremio: prizePerUser,
+                    porcentaje: pctPerUser
+                });
+            });
+        }
+
+        for (const g of distribucion) {
+            await query(
+                `INSERT INTO ganadores_finales (id_usuario,posicion,puntos,porcentaje_premio,monto_premio) VALUES ($1,$2,$3,$4,$5)`,
+                [g.IdUsuario, g.Posicion, g.Puntos, parseFloat(g.porcentaje), g.montoPremio]
+            );
+        }
+
+        await query(`UPDATE config_quiniela SET valor='1' WHERE clave='GanadoresRevelados'`);
+
+        const todosResult = await obtenerTablaGeneralRankings();
+        const todos = { rows: todosResult.filter(u => u.Correo && u.Correo !== '') };
+
+        const fmt = n => `$${Number(n).toLocaleString('es-MX',{minimumFractionDigits:2})} MXN`;
+        const medallas = {1:'🥇',2:'🥈',3:'🥉'};
+        const tablaHTML = distribucion.map(g=>`<tr><td>${medallas[g.Posicion]}</td><td>${g.Nombre}</td><td>${g.Puntos} pts</td><td style="color:#2ecc71;">${fmt(g.montoPremio)}</td></tr>`).join('');
+
+        for (const u of todos.rows) {
+            const ganadorInfo = distribucion.find(g => g.IdUsuario === u.id_usuario);
+            const html = `<div style="font-family:sans-serif;max-width:600px;background:#05101a;color:white;border-radius:16px;overflow:hidden;border:1px solid #f1c40f;">
+                <div style="background:linear-gradient(135deg,#e74c3c,#c0392b);padding:1.5rem;text-align:center;"><h1 style="color:#fff;margin:0;">⚠️ FE DE ERRATAS: Resultados Oficiales</h1></div>
+                <div style="padding:1.5rem;background:rgba(231,76,60,0.1);border-left:4px solid #e74c3c;margin:1rem;">
+                    <p style="margin:0;font-size:0.95rem;line-height:1.6;color:#f39c12;">
+                        <strong>Aviso de Corrección (Fe de Erratas):</strong> Se detectó un error de captura en el marcador de la final del campeón España (se había registrado temporalmente un marcador distinto a 0-0). 
+                        Tras corregir el marcador a <strong>0-0</strong>, se recalcularon los puntajes finales.
+                        Con esta corrección, <strong>Ulises Saul Ramirez Diaz</strong> obtiene la primera posición oficial con <strong>232 puntos</strong>.
+                        Adjuntamos la tabla de posiciones y distribución de premios oficial definitiva.
+                    </p>
+                </div>
+                ${ganadorInfo?`<div style="padding:1.5rem;text-align:center;"><p style="font-size:3rem;">${medallas[ganadorInfo.Posicion]}</p><h2 style="color:#2ecc71;">¡Felicidades ${u.nombre}!</h2><p>Premio: <strong style="color:#f1c40f;font-size:1.5rem;">${fmt(ganadorInfo.montoPremio)}</strong></p></div>`:`<div style="padding:1.5rem;text-align:center;"><p>Hola ${u.nombre}, terminaste en ${u.posicion}° con ${u.puntos} pts. ¡Gracias por participar!</p></div>`}
+                <div style="padding:1rem;"><table style="width:100%;"><thead><tr><th>Pos</th><th>Nombre</th><th>Puntos</th><th>Premio</th></tr></thead><tbody>${tablaHTML}</tbody></table></div>
+                <div style="padding:1rem;text-align:center;"><small>Quiniela Mundial 2026 — torreslab</small></div></div>`;
+            
+            // Usando el wrapper interno de envío de correo
+            await enviarCorreoResultado({ 
+                correo: u.correo, 
+                nombre: u.nombre, 
+                asunto: '⚠️ FE DE ERRATAS: Resultados Oficiales Finales - Quiniela Mundial 2026', 
+                htmlPersonalizado: html, 
+                idUsuario: u.id_usuario 
+            });
+        }
+
+        return res.json({ ok: true, message: `🏆 Fe de erratas procesada y correos de rectificación enviados.`, distribucion });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: 'Error al procesar fe de erratas.' });
+    }
+});
+
 // ─── ADMIN: PENDIENTES ────────────────────────────────────────────────────────
 router.get('/admin/pendientes', async (req, res) => {
     try {
